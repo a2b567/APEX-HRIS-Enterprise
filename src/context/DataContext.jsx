@@ -888,6 +888,26 @@ export const DataProvider = ({ children }) => {
     return { success: true };
   };
 
+  const updateUserAccount = (userId, updatedFields) => {
+    let updatedUser = null;
+    setUsers((prev) =>
+      prev.map((u) => {
+        if (u.id === userId || (u.username && updatedFields.currentUsername && u.username.toLowerCase() === updatedFields.currentUsername.toLowerCase())) {
+          const pass = updatedFields.password;
+          updatedUser = {
+            ...u,
+            ...updatedFields,
+            password: pass ? (pass.startsWith('hashed_') ? pass : `hashed_${pass}`) : u.password,
+          };
+          delete updatedUser.currentUsername;
+          return updatedUser;
+        }
+        return u;
+      })
+    );
+    return { success: true, user: updatedUser };
+  };
+
   return (
     <DataContext.Provider
       value={{
@@ -917,6 +937,7 @@ export const DataProvider = ({ children }) => {
         addManualAttendance,
         deleteAttendanceLog,
         updateSettings,
+        updateUserAccount,
         resetToFactoryDefaults,
       }}
     >
