@@ -114,6 +114,16 @@ export const INITIAL_SETTINGS = {
   withholdingTaxEnabled: true,
   qrCodeRefreshIntervalSeconds: 60,
   qrDynamicEncryptionEnabled: true,
+  securityEncryption: {
+    aes256Enabled: true,
+    atRestEncryption: true,
+    qrEncryptionEnabled: true,
+    auditLogHashing: true,
+    encryptionSalt: 'APEX_DTR_SECURE_SALT_v2_2026',
+    sessionTimeoutMinutes: 60,
+    twoFactorEnforced: false,
+    tlsEnforced: true,
+  },
   defaultShift: {
     startTime: '08:00',
     endTime: '17:00',
