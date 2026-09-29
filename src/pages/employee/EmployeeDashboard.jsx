@@ -147,49 +147,46 @@ export const EmployeeDashboard = () => {
             </div>
           </div>
 
-          {/* Today's Punch Status Display */}
-          <div className="my-4 bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 text-xs">
-            <div className="flex justify-between items-center text-slate-600 mb-1">
-              <span>Time In:</span>
-              <span className="font-mono font-bold text-emerald-600">
-                {todayLog?.timeIn ? formatTime(todayLog.timeIn) : 'Not Clocked In'}
-              </span>
+          {/* Today's QR Punch Status Display */}
+          <div className="my-4 bg-slate-50 p-4 rounded-xl border border-slate-200/80 text-xs text-left space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500 font-medium">QR Attendance Status:</span>
+              {todayLog?.timeIn && !todayLog?.timeOut ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  <span className="w-2 h-2 rounded-full bg-emerald-600 animate-ping"></span>
+                  Clocked In
+                </span>
+              ) : todayLog?.timeIn && todayLog?.timeOut ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-300">
+                  Clocked Out
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                  Not Clocked In
+                </span>
+              )}
             </div>
-            <div className="flex justify-between items-center text-slate-600">
-              <span>Time Out:</span>
-              <span className="font-mono font-bold text-blue-600">
-                {todayLog?.timeOut ? formatTime(todayLog.timeOut) : 'Pending Out'}
-              </span>
+
+            <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/60">
+              <div className="bg-white p-2.5 rounded-lg border border-slate-200">
+                <span className="text-[10px] uppercase font-semibold text-slate-400 block">Time In</span>
+                <span className="font-mono font-bold text-slate-900 text-sm">
+                  {todayLog?.timeIn ? formatTime(todayLog.timeIn) : '— —'}
+                </span>
+              </div>
+              <div className="bg-white p-2.5 rounded-lg border border-slate-200">
+                <span className="text-[10px] uppercase font-semibold text-slate-400 block">Time Out</span>
+                <span className="font-mono font-bold text-slate-900 text-sm">
+                  {todayLog?.timeOut ? formatTime(todayLog.timeOut) : '— —'}
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* Punch Action Buttons */}
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => handlePunch('IN')}
-              disabled={!!todayLog?.timeIn}
-              className={`py-2.5 px-3 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1.5 ${
-                !todayLog?.timeIn
-                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
-                  : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-              }`}
-            >
-              <Clock className="w-4 h-4" />
-              <span>{todayLog?.timeIn ? 'Clocked In' : 'Time In'}</span>
-            </button>
-
-            <button
-              onClick={() => handlePunch('OUT')}
-              disabled={!todayLog?.timeIn || !!todayLog?.timeOut}
-              className={`py-2.5 px-3 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1.5 ${
-                todayLog?.timeIn && !todayLog?.timeOut
-                  ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
-                  : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-              }`}
-            >
-              <Clock className="w-4 h-4" />
-              <span>{todayLog?.timeOut ? 'Clocked Out' : 'Time Out'}</span>
-            </button>
+          {/* QR Attendance Notice */}
+          <div className="p-3 bg-blue-50/70 border border-blue-200/80 rounded-xl text-[11px] text-blue-800 flex items-center justify-center gap-2">
+            <Shield className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+            <span>Scan your QR Badge at the Kiosk to Clock In / Out</span>
           </div>
         </div>
       </div>

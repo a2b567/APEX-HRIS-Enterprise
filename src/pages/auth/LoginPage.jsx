@@ -60,6 +60,59 @@ export const LoginPage = () => {
   const navigate = useNavigate();
   const { addToast } = useToast();
 
+  const roleConfigs = [
+    {
+      id: 'ADMIN',
+      title: 'Admin',
+      subtitle: 'Full system access',
+      icon: ShieldCheck,
+      defaultUser: 'admin',
+      defaultPass: 'Admin@123',
+    },
+    {
+      id: 'SUPERVISOR',
+      title: 'Supervisor',
+      subtitle: 'Branch management',
+      icon: Briefcase,
+      defaultUser: 'supervisor1',
+      defaultPass: 'Sup@123',
+    },
+    {
+      id: 'EMPLOYEE',
+      title: 'Employee',
+      subtitle: 'Self-service portal',
+      icon: User,
+      defaultUser: 'employee1',
+      defaultPass: 'Emp@123',
+    },
+  ];
+
+  const handleRoleSelect = (roleId) => {
+    setSelectedRole(roleId);
+    setErrorMessage('');
+  };
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setErrorMessage('');
+    setSubmitting(true);
+    try {
+      const result = await login(email, password);
+      if (result.success) {
+        const role = result.user?.role;
+        if (role === 'SUPER_ADMIN') navigate('/dashboard');
+        else if (role === 'SUPERVISOR') navigate('/supervisor/dashboard');
+        else navigate('/employee/dashboard');
+      } else {
+        setErrorMessage(result.message || 'Login failed. Check your credentials.');
+      }
+    } catch (err) {
+      setErrorMessage(err.message || 'An unexpected error occurred.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleIdFileUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -365,7 +418,7 @@ export const LoginPage = () => {
                 <form onSubmit={handleLogin} className="space-y-4 pt-1">
                   <div>
                     <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">
-                      Full Name or Username
+                      Full Name, Username, or Employee ID
                     </label>
                     <div className="relative rounded-xl">
                       <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -376,7 +429,7 @@ export const LoginPage = () => {
                         required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        placeholder="e.g. Maria Santos or maria.santos"
+                        placeholder="e.g. Maria Santos or EMP-2026-001"
                         className="block w-full pl-10 pr-3.5 py-2.5 sm:py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition shadow-sm"
                       />
                     </div>
@@ -674,7 +727,7 @@ export const LoginPage = () => {
                         </label>
 
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] text-slate-400">Or use instant demo ID:</span>
+                          <span className="text-[10px] text-slate-400">Or use instant sample ID:</span>
                           <button
                             type="button"
                             onClick={handleUseSampleId}

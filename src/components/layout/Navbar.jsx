@@ -10,7 +10,6 @@ import {
   LogOut,
   RefreshCw,
   ChevronDown,
-  Search,
   Bell,
   CheckCircle2,
   FileText,
@@ -55,15 +54,7 @@ export const Navbar = ({ sidebarOpen, setSidebarOpen }) => {
           </svg>
         </button>
 
-        {/* Search Bar matching Figma header */}
-        <div className="relative w-full hidden sm:block">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search employees, DTR logs, branch records..."
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition"
-          />
-        </div>
+
       </div>
 
       {/* Right section: Live Time, Badges, Switcher, Profile */}

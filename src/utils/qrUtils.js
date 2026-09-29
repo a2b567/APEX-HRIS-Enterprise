@@ -43,37 +43,60 @@ export const parseQRPayload = (qrString) => {
   // 1. Try parsing JSON structured payload
   try {
     const data = JSON.parse(trimmed);
-    if (data.empId && data.branchId) {
-      return {
-        success: true,
-        employeeId: data.empId,
-        branchId: data.branchId,
-        name: data.name || '',
-        token: data.token || '',
-        issuedAt: data.iat || '',
-      };
-    }
-  } catch (e) {
-    // Fallback: try parsing hyphen-separated format (e.g. EMP-001-01-BRANCH-001-a3f9c2d1)
-  }
-
-  // 2. Fallback: direct employee ID match or legacy token
-  if (trimmed.startsWith('EMP-')) {
-    const parts = trimmed.split('-');
-    // Expected format: EMP-001-01 or EMP-001-01-BRANCH-001-...
-    if (parts.length >= 3) {
-      const branchNum = parts[1]; // e.g. 001
-      const empId = `EMP-${parts[1]}-${parts[2]}`;
-      const branchId = `BRANCH-${branchNum}`;
+    const empId = data.empId || data.employeeId || data.id || data.employee_id || data.employeeCode;
+    const branchId = data.branchId || data.branch_id;
+    if (empId) {
       return {
         success: true,
         employeeId: empId,
-        branchId: branchId,
-        name: '',
-        token: trimmed,
-        issuedAt: new Date().toISOString().split('T')[0],
+        branchId: branchId || '',
+        name: data.name || '',
+        token: data.token || '',
+        issuedAt: data.iat || new Date().toISOString().split('T')[0],
       };
     }
+  } catch (e) {
+    // Not JSON, continue to string patterns
+  }
+
+  // 2. Token pattern: EMP-001-01-BRANCH-001-xxxx or similar
+  if (trimmed.includes('-BRANCH-')) {
+    const parts = trimmed.split('-BRANCH-');
+    const empId = parts[0];
+    const rest = parts[1] ? parts[1].split('-') : [];
+    const branchId = rest[0] ? `BRANCH-${rest[0]}` : '';
+    return {
+      success: true,
+      employeeId: empId,
+      branchId: branchId,
+      name: '',
+      token: trimmed,
+      issuedAt: new Date().toISOString().split('T')[0],
+    };
+  }
+
+  // 3. Direct ID formats (EMP-xxx-yy, EMP-xxx, EMPxxx, etc.)
+  if (trimmed.toUpperCase().startsWith('EMP')) {
+    return {
+      success: true,
+      employeeId: trimmed,
+      branchId: '',
+      name: '',
+      token: trimmed,
+      issuedAt: new Date().toISOString().split('T')[0],
+    };
+  }
+
+  // 4. Any non-empty string fallback (could be employee ID, username, or name)
+  if (trimmed.length > 0) {
+    return {
+      success: true,
+      employeeId: trimmed,
+      branchId: '',
+      name: '',
+      token: trimmed,
+      issuedAt: new Date().toISOString().split('T')[0],
+    };
   }
 
   return { success: false, error: 'Unrecognized QR code format. Not a valid Company Employee Badge.' };

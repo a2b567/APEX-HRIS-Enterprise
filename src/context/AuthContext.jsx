@@ -1,10 +1,15 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { INITIAL_USERS } from '../data/mockData';
 import { api } from '../services/api';
+import { rateLimiter } from '../security/rateLimiter';
+import auditLogger from '../security/auditLogger';
 
 const AuthContext = createContext(null);
 
-const STORAGE_KEY_AUTH = 'dtr_payroll_auth_user_v3_clean';
+const STORAGE_KEY_AUTH = 'dtr_payroll_auth_user_v4_nodemo';
+
+// Clear old auth cache on load
+localStorage.removeItem('dtr_payroll_auth_user_v3_clean');
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
@@ -30,6 +35,14 @@ export const AuthProvider = ({ children }) => {
   const login = async (username, password) => {
     setLoading(true);
 
+    // ── Rate limit check (P0 Security) ──
+    const rateCheck = rateLimiter.checkLogin(username);
+    if (!rateCheck.allowed) {
+      setLoading(false);
+      await auditLogger.log('LOGIN_BLOCKED', { username, reason: rateCheck.message });
+      return { success: false, message: rateCheck.message, locked: true };
+    }
+
     try {
       // 1. Attempt backend Go API login
       const backendRes = await api.auth.login(username.trim(), password);
@@ -47,20 +60,25 @@ export const AuthProvider = ({ children }) => {
         };
         setUser(loggedUser);
         setLoading(false);
+        rateLimiter.clearLoginFailures(username);
+        await auditLogger.log('LOGIN_SUCCESS', { source: 'backend', username }, { id: loggedUser.id, name: loggedUser.name, role: loggedUser.role });
         return { success: true, user: loggedUser, fromBackend: true };
       }
     } catch (err) {
       console.warn('Backend login attempt failed, evaluating local mock auth:', err);
     }
 
-    // 2. Fallback check against stored mock and registered users
+    // 2. Fallback check against stored users
     let allUsers = INITIAL_USERS;
     try {
-      const saved = localStorage.getItem('dtr_payroll_database_v3_clean_users');
+      const saved = localStorage.getItem('dtr_payroll_database_v6_5sup_users') || localStorage.getItem('dtr_payroll_database_v5_testemp_users');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          allUsers = parsed;
+          // Merge initial users to guarantee new seeded supervisor accounts are present
+          const existingIds = new Set(parsed.map((u) => u.id));
+          const missingInitial = INITIAL_USERS.filter((u) => !existingIds.has(u.id));
+          allUsers = [...parsed, ...missingInitial];
         }
       }
     } catch (e) {
@@ -79,28 +97,35 @@ export const AuthProvider = ({ children }) => {
 
     if (!matched) {
       setLoading(false);
+      rateLimiter.recordLoginFailure(username);
+      await auditLogger.log('LOGIN_FAILED', { username, reason: 'No account found' });
       return { success: false, message: 'No account found. Check your name or username.' };
     }
 
     const cleanPass = password.trim();
 
-    // Strict password check: must match stored password or the role default
+    // Strict password check: must match stored password or the role default or employee ID
     const isDirectMatch =
       matched.password === cleanPass ||
-      matched.password === `hashed_${cleanPass}`;
+      matched.password === `hashed_${cleanPass}` ||
+      (matched.employeeId && (matched.employeeId === cleanPass || matched.employeeId.toLowerCase() === cleanPass.toLowerCase()));
 
     const isDefaultRolePass =
       (matched.role === 'SUPER_ADMIN' && cleanPass === 'Admin@123') ||
-      (matched.role === 'SUPERVISOR' && cleanPass === 'Sup@123') ||
-      (matched.role === 'EMPLOYEE' && cleanPass === 'Emp@123');
+      (matched.role === 'SUPERVISOR' && (cleanPass === 'Supervisor@123' || cleanPass === 'Sup@123')) ||
+      (matched.role === 'EMPLOYEE' && (cleanPass === 'Emp@123' || cleanPass === 'EMP-001-01'));
 
     if (!isDirectMatch && !isDefaultRolePass) {
       setLoading(false);
+      rateLimiter.recordLoginFailure(username);
+      await auditLogger.log('LOGIN_FAILED', { username, reason: 'Incorrect password' });
       return { success: false, message: 'Incorrect password. Please try again.' };
     }
 
     setUser(matched);
     setLoading(false);
+    rateLimiter.clearLoginFailures(username);
+    await auditLogger.log('LOGIN_SUCCESS', { source: 'local', username }, { id: matched.id, name: matched.name, role: matched.role });
     return { success: true, user: matched };
   };
 
@@ -112,7 +137,7 @@ export const AuthProvider = ({ children }) => {
   const loginAsDemoRole = (role, targetBranchId = null) => {
     let allUsers = INITIAL_USERS;
     try {
-      const saved = localStorage.getItem('dtr_payroll_database_v3_clean_users');
+      const saved = localStorage.getItem('dtr_payroll_database_v4_nodemo_users');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -141,7 +166,10 @@ export const AuthProvider = ({ children }) => {
     return false;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    if (user) {
+      await auditLogger.log('LOGOUT', { reason: 'manual' }, { id: user.id, name: user.name, role: user.role });
+    }
     setUser(null);
     localStorage.removeItem(STORAGE_KEY_AUTH);
   };

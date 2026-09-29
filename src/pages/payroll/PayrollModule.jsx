@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { useBranchScope } from '../../hooks/useBranchScope';
@@ -6,6 +6,7 @@ import Modal from '../../components/shared/Modal';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { computeEmployeePayroll } from '../../utils/payrollCalculator';
 import { useToast } from '../../components/shared/Toast';
+import PayrollQRScanner from '../../components/qr/PayrollQRScanner';
 import {
   Banknote,
   Calendar,
@@ -19,11 +20,15 @@ import {
   ChevronRight,
   Shield,
   FileSpreadsheet,
+  QrCode,
+  ScanLine,
+  X,
+  RotateCcw,
 } from 'lucide-react';
 
 export const PayrollModule = () => {
   const { role, user } = useAuth();
-  const { branches, employees, attendanceLogs, settings } = useData();
+  const { branches, employees, attendanceLogs, settings, getDisbursementStatus, togglePayrollDisbursement, disbursePayrollByQR } = useData();
   const branchScope = useBranchScope();
   const { addToast } = useToast();
 
@@ -39,6 +44,23 @@ export const PayrollModule = () => {
 
   // Selected Payslip for printable view
   const [activePayslip, setActivePayslip] = useState(null);
+
+  // QR Disbursement Scanner
+  const [qrScanOpen, setQrScanOpen] = useState(false);
+  const [qrResult, setQrResult] = useState(null);
+  const qrInputRef = useRef(null);
+
+  // Handle QR scan / manual entry from PayrollQRScanner
+  const handleDisburseScan = useCallback((rawText) => {
+    if (!rawText || !rawText.trim()) return;
+    const res = disbursePayrollByQR(rawText.trim(), selectedMonth, cutoffType, user?.name || 'HR Officer');
+    setQrResult(res);
+    if (res.success) {
+      addToast({ title: '✅ Salary Disbursed!', message: res.message, type: 'success' });
+    } else {
+      addToast({ title: '⚠️ Scan Notice', message: res.message || 'QR code not recognized.', type: 'warning' });
+    }
+  }, [disbursePayrollByQR, selectedMonth, cutoffType, user, addToast]);
 
   // Scoped employees
   const targetEmployees = useMemo(() => {
@@ -207,6 +229,13 @@ export const PayrollModule = () => {
 
         <div className="flex flex-wrap items-center gap-2.5">
           <button
+            onClick={() => { setQrScanOpen(true); setQrResult(null); setQrInput(''); setTimeout(() => qrInputRef.current?.focus(), 100); }}
+            className="flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-xs font-semibold shadow-sm transition"
+          >
+            <QrCode className="w-4 h-4" />
+            <span>QR Salary Release</span>
+          </button>
+          <button
             onClick={handleExportPayrollCSV}
             className="flex items-center gap-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 py-2 text-xs font-semibold shadow-sm transition"
           >
@@ -372,15 +401,17 @@ export const PayrollModule = () => {
                 <th className="py-3.5 px-4">Gross Pay</th>
                 <th className="py-3.5 px-4">Total Deductions</th>
                 <th className="py-3.5 px-4">Net Take Home</th>
+                <th className="py-3.5 px-4">Disbursed</th>
                 <th className="py-3.5 px-4 text-right">Payslip</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {payrollRecords.map((p) => {
                 const branchObj = branches.find((b) => b.id === p.branchId);
+                const disbStatus = getDisbursementStatus(p.employeeId, selectedMonth, cutoffType);
 
                 return (
-                  <tr key={p.employeeId} className="hover:bg-slate-50/80 transition">
+                  <tr key={p.employeeId} className={`hover:bg-slate-50/80 transition ${disbStatus.disbursed ? 'bg-emerald-50/30' : ''}`}>
                     <td className="py-3 px-4">
                       <div className="font-semibold text-slate-900">{p.employeeName}</div>
                       <div className="font-mono text-[10px] text-blue-600">{p.employeeId}</div>
@@ -418,6 +449,50 @@ export const PayrollModule = () => {
 
                     <td className="py-3 px-4 font-mono font-extrabold text-emerald-600">
                       {formatCurrency(p.netPay)}
+                    </td>
+
+                    {/* Disbursement Status — QR Scan Required */}
+                    <td className="py-3 px-4">
+                      {disbStatus.disbursed ? (
+                        <div className="flex flex-col gap-0.5">
+                          <button
+                            onClick={() => {
+                              if (!window.confirm(`Reset disbursement for ${p.employeeName}? This will mark salary as Pending again.`)) return;
+                              const res = togglePayrollDisbursement(p.employeeId, selectedMonth, cutoffType, user?.name || 'HR Officer');
+                              addToast({
+                                title: 'Disbursement Reset',
+                                message: `${p.employeeName} salary status reset to Pending.`,
+                                type: 'info',
+                              });
+                            }}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 transition group"
+                            title={`Paid via ${disbStatus.method} on ${disbStatus.disbursedAt ? new Date(disbStatus.disbursedAt).toLocaleString() : '—'}\nClick to reset`}
+                          >
+                            <CheckCircle2 className="w-3 h-3" />
+                            <span>PAID</span>
+                          </button>
+                          <span className="text-[9px] text-slate-400 font-mono pl-0.5">
+                            {disbStatus.method === 'QR Code Badge Scan' ? '🔐 QR Verified' : `📝 ${disbStatus.method}`}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-0.5">
+                          <button
+                            onClick={() => {
+                              setQrScanOpen(true);
+                              setQrResult(null);
+                              setQrInput('');
+                              setTimeout(() => qrInputRef.current?.focus(), 100);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border bg-amber-50 text-amber-800 border-amber-300 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition"
+                            title="QR badge scan required to release salary"
+                          >
+                            <QrCode className="w-3 h-3" />
+                            <span>Scan QR</span>
+                          </button>
+                          <span className="text-[9px] text-slate-400 pl-0.5">Awaiting scan</span>
+                        </div>
+                      )}
                     </td>
 
                     <td className="py-3 px-4 text-right">
@@ -562,6 +637,30 @@ export const PayrollModule = () => {
                 <span>Print Official Payslip</span>
               </button>
             </div>
+          </div>
+        </Modal>
+      )}
+      {/* QR Salary Disbursement Scanner Modal */}
+      {qrScanOpen && (
+        <Modal
+          isOpen={qrScanOpen}
+          onClose={() => { setQrScanOpen(false); setQrResult(null); }}
+          title="QR Salary Release / Disbursement"
+          subtitle={`Period: ${cutoffType} \u00b7 ${selectedMonth}`}
+          maxWidth="max-w-lg"
+        >
+          <div className="space-y-2">
+            <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-800 flex items-center gap-3">
+              <ScanLine className="w-5 h-5 text-blue-600 shrink-0" />
+              <span>
+                Point the employee's <strong>QR Badge</strong> at the camera below.
+                Salary will be marked as <strong>DISBURSED & PAID</strong> instantly upon scan.
+              </span>
+            </div>
+            <PayrollQRScanner
+              onScanSuccess={handleDisburseScan}
+              lastResult={qrResult}
+            />
           </div>
         </Modal>
       )}

@@ -121,7 +121,7 @@ export const SupervisorManagement = () => {
             <span className="text-xs text-slate-500 font-medium">Strict Rule: 1 Supervisor per Branch</span>
           </div>
           <h1 className="mt-1 text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-            Supervisor Governance
+            Supervisor
           </h1>
           <p className="text-xs text-slate-500">
             Manage site supervisors. Each branch is strictly tied to one active supervisor.
@@ -145,11 +145,10 @@ export const SupervisorManagement = () => {
           return (
             <div
               key={sup.id}
-              className={`rounded-3xl border p-5 shadow-card hover:shadow-card-hover transition-all flex flex-col justify-between ${
-                sup.status === 'Active'
+              className={`rounded-3xl border p-5 shadow-card hover:shadow-card-hover transition-all flex flex-col justify-between ${sup.status === 'Active'
                   ? 'bg-white border-slate-200/90'
                   : 'bg-slate-50 border-slate-200 opacity-75'
-              }`}
+                }`}
             >
               <div>
                 {/* Header */}
@@ -165,11 +164,10 @@ export const SupervisorManagement = () => {
                   </div>
 
                   <span
-                    className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
-                      sup.status === 'Active'
+                    className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${sup.status === 'Active'
                         ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                         : 'bg-rose-50 text-rose-700 border-rose-200'
-                    }`}
+                      }`}
                   >
                     {sup.status}
                   </span>
@@ -212,11 +210,10 @@ export const SupervisorManagement = () => {
               <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
                 <button
                   onClick={() => handleToggleStatus(sup)}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold border transition ${
-                    sup.status === 'Active'
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold border transition ${sup.status === 'Active'
                       ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200'
                       : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
-                  }`}
+                    }`}
                 >
                   <Power className="w-3.5 h-3.5" />
                   <span>{sup.status === 'Active' ? 'Deactivate' : 'Activate'}</span>

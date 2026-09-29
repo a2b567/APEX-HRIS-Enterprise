@@ -415,10 +415,10 @@ export const AdminDashboard = () => {
                       className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold ${
                         scan.action === 'TIME_IN'
                           ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : 'bg-blue-50 text-blue-700 border border-blue-200'
+                          : 'bg-rose-50 text-rose-700 border border-rose-200'
                       }`}
                     >
-                      {scan.action === 'TIME_IN' ? 'Time In' : 'Time Out'}
+                      {scan.action === 'TIME_IN' ? '🟢 Time In' : '🔴 Time Out'}
                     </span>
                     <p className="font-mono text-[10px] text-slate-500 mt-0.5">{scan.time}</p>
                   </div>

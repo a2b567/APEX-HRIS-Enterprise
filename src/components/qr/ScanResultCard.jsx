@@ -22,17 +22,27 @@ export const ScanResultCard = ({ result, onClose }) => {
       Icon = XCircle;
       iconColor = 'text-rose-600 bg-rose-100';
       title = 'ACCESS DENIED: Wrong Branch';
+    } else if (isAlreadyCompleted) {
+      cardStyle = 'border-rose-300 bg-rose-50 text-rose-950 shadow-rose-100';
+      Icon = XCircle;
+      iconColor = 'text-rose-600 bg-rose-100 ring-2 ring-rose-200';
+      title = '🚫 SCAN BLOCKED: Already Completed (1 In, 1 Out Only)';
+    } else if (result.reason === 'EARLY_TIMEOUT_BLOCKED') {
+      cardStyle = 'border-amber-300 bg-amber-50 text-amber-950 shadow-amber-100';
+      Icon = Clock;
+      iconColor = 'text-amber-600 bg-amber-100 ring-2 ring-amber-200';
+      title = '⏳ BAWAL PA MAG-OUT: Hindi Pa Oras ng Dismissal';
     } else {
       cardStyle = 'border-amber-200 bg-amber-50 text-amber-900';
       Icon = AlertTriangle;
       iconColor = 'text-amber-600 bg-amber-100';
-      title = isAlreadyCompleted ? 'Already Completed Today' : 'Scan Error';
+      title = 'Scan Error';
     }
   } else if (!isTimeIn) {
-    cardStyle = 'border-blue-200 bg-blue-50 text-blue-900';
+    cardStyle = 'border-rose-300 bg-rose-50 text-rose-950 shadow-rose-100';
     Icon = Clock;
-    iconColor = 'text-blue-600 bg-blue-100';
-    title = 'Time Out Recorded Successfully';
+    iconColor = 'text-rose-600 bg-rose-100 ring-2 ring-rose-200';
+    title = '🔴 Time Out Recorded (OUT)';
   } else if (isLate) {
     cardStyle = 'border-amber-200 bg-amber-50 text-amber-900';
     Icon = AlertTriangle;

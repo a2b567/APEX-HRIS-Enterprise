@@ -1,24 +1,69 @@
 /**
- * CLEAN INITIAL SYSTEM CONFIGURATION
- * Real staff accounts ready for timekeeping, with zero simulated attendance data.
+ * APEX HRIS Enterprise — Clean System Seed
+ * No demo data. All collections start empty.
+ * Only the Super Admin account is pre-seeded for initial login.
  */
 
 export const INITIAL_BRANCHES = [
   {
     id: 'BRANCH-001',
-    code: 'B01',
-    name: 'Main Branch - Head Office',
-    location: 'Bonifacio Global City, Taguig, Metro Manila',
-    contactNumber: '+63 2 8888 1001',
-    email: 'main.branch@apexhris.enterprise',
-    supervisorId: 2,
+    code: 'B001',
+    name: 'Headquarters Main Branch',
+    location: 'Corporate Center, Ayala Ave, Makati City',
+    contactNumber: '+63 (02) 8888-0101',
+    email: 'makati.hq@apexhris.enterprise',
+    supervisorId: 101,
     status: 'Active',
-    establishedDate: new Date().toISOString().slice(0, 10),
+    establishedDate: '2026-01-01',
+  },
+  {
+    id: 'BRANCH-002',
+    code: 'B002',
+    name: 'BGC Innovation Hub',
+    location: 'High Street South, Bonifacio Global City, Taguig',
+    contactNumber: '+63 (02) 8888-0102',
+    email: 'bgc.hub@apexhris.enterprise',
+    supervisorId: 102,
+    status: 'Active',
+    establishedDate: '2026-01-05',
+  },
+  {
+    id: 'BRANCH-003',
+    code: 'B003',
+    name: 'Cebu IT Park Regional Hub',
+    location: 'Asia Town IT Park, Lahug, Cebu City',
+    contactNumber: '+63 (32) 412-8803',
+    email: 'cebu.hub@apexhris.enterprise',
+    supervisorId: 103,
+    status: 'Active',
+    establishedDate: '2026-01-10',
+  },
+  {
+    id: 'BRANCH-004',
+    code: 'B004',
+    name: 'Davao Regional Center',
+    location: 'Abreeza Corporate Center, Bajada, Davao City',
+    contactNumber: '+63 (82) 298-8804',
+    email: 'davao.hub@apexhris.enterprise',
+    supervisorId: 104,
+    status: 'Active',
+    establishedDate: '2026-01-15',
+  },
+  {
+    id: 'BRANCH-005',
+    code: 'B005',
+    name: 'Ortigas Commercial Center',
+    location: 'ADB Avenue, Ortigas Center, Pasig City',
+    contactNumber: '+63 (02) 8888-0105',
+    email: 'ortigas.hub@apexhris.enterprise',
+    supervisorId: 105,
+    status: 'Active',
+    establishedDate: '2026-01-20',
   },
 ];
 
+// Seeded Super Admin, 5 Supervisors, and 1 Test Employee Account
 export const INITIAL_USERS = [
-  // 1 Super Admin (Full System Access)
   {
     id: 1,
     role: 'SUPER_ADMIN',
@@ -29,80 +74,124 @@ export const INITIAL_USERS = [
     position: 'Chief Administrator',
     avatar: '',
     status: 'Active',
-    branchId: null, // Global access
+    branchId: null, // Global access — no branch restriction
   },
-
-  // Supervisor (Branch Management)
   {
-    id: 2,
+    id: 101,
     role: 'SUPERVISOR',
-    username: 'supervisor1',
-    password: 'hashed_Sup@123',
-    name: 'Operations Supervisor',
-    email: 'supervisor1@apexhris.enterprise',
+    username: 'sup.makati',
+    password: 'hashed_Supervisor@123',
+    name: 'Maria Santos',
+    email: 'maria.santos@apexhris.enterprise',
     position: 'Branch Operations Supervisor',
     branchId: 'BRANCH-001',
-    avatar: '',
+    phone: '+63 917 111 2233',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=maria.santos',
     status: 'Active',
-    phone: '+63 917 000 0001',
   },
-
-  // Staff / Employee Account
   {
-    id: 3,
+    id: 102,
+    role: 'SUPERVISOR',
+    username: 'sup.bgc',
+    password: 'hashed_Supervisor@123',
+    name: 'Carlo Reyes',
+    email: 'carlo.reyes@apexhris.enterprise',
+    position: 'Branch Operations Supervisor',
+    branchId: 'BRANCH-002',
+    phone: '+63 917 222 3344',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=carlo.reyes',
+    status: 'Active',
+  },
+  {
+    id: 103,
+    role: 'SUPERVISOR',
+    username: 'sup.cebu',
+    password: 'hashed_Supervisor@123',
+    name: 'Elena Villanueva',
+    email: 'elena.villanueva@apexhris.enterprise',
+    position: 'Branch Operations Supervisor',
+    branchId: 'BRANCH-003',
+    phone: '+63 917 333 4455',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=elena.villanueva',
+    status: 'Active',
+  },
+  {
+    id: 104,
+    role: 'SUPERVISOR',
+    username: 'sup.davao',
+    password: 'hashed_Supervisor@123',
+    name: 'Mark Torres',
+    email: 'mark.torres@apexhris.enterprise',
+    position: 'Branch Operations Supervisor',
+    branchId: 'BRANCH-004',
+    phone: '+63 917 444 5566',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=mark.torres',
+    status: 'Active',
+  },
+  {
+    id: 105,
+    role: 'SUPERVISOR',
+    username: 'sup.ortigas',
+    password: 'hashed_Supervisor@123',
+    name: 'Patricia Lim',
+    email: 'patricia.lim@apexhris.enterprise',
+    position: 'Branch Operations Supervisor',
+    branchId: 'BRANCH-005',
+    phone: '+63 917 555 6677',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=patricia.lim',
+    status: 'Active',
+  },
+  {
+    id: 2,
     role: 'EMPLOYEE',
-    username: 'employee1',
-    password: 'hashed_Emp@123',
-    name: 'Juan Dela Cruz',
-    email: 'juan.delacruz@apexhris.enterprise',
-    position: 'Front Desk & Staff',
+    username: 'juan.cruz',
+    password: 'hashed_EMP-001-01',
+    name: 'Juan Cruz',
+    email: 'juan.cruz@apexhris.enterprise',
+    position: 'Software Engineer',
     employeeId: 'EMP-001-01',
     branchId: 'BRANCH-001',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=juan.cruz',
     status: 'Active',
+    phone: '+63 917 123 4567',
   },
 ];
 
-// Active Staff Profiles (Ready for Badges & Time Tracking)
+// 1 Seeded Employee Record for testing
 export const INITIAL_EMPLOYEES = [
   {
     id: 'EMP-001-01',
-    userId: 3,
-    name: 'Juan Dela Cruz',
-    email: 'juan.delacruz@apexhris.enterprise',
-    phone: '+63 917 123 4567',
+    userId: 2,
+    name: 'Juan Cruz',
+    email: 'juan.cruz@apexhris.enterprise',
+    position: 'Software Engineer',
+    department: 'Technology',
     branchId: 'BRANCH-001',
-    department: 'Operations',
-    position: 'Front Desk & Staff',
-    employmentType: 'Regular Full-Time',
-    dailyRate: 750.00,
-    hourlyRate: 93.75,
-    hireDate: new Date().toISOString().slice(0, 10),
+    dailyRate: 1000,
+    hourlyRate: 125,
     status: 'Active',
-    tin: '',
-    sss: '',
-    philhealth: '',
-    pagibig: '',
-    bankAccount: '',
-    qrToken: 'EMP-001-01-BRANCH-001-v1',
-    qrIssuedAt: new Date().toISOString().slice(0, 10),
+    hireDate: '2026-01-15',
+    qrToken: 'APEX-EMP-001-01-BRANCH-001-SECURE',
+    qrIssuedAt: '2026-01-15',
     qrStatus: 'active',
-    idType: 'PhilID / National ID',
-    idDocumentName: 'juan_delacruz_phid.jpg',
+    idType: 'Government ID / PhilID',
     idVerificationStatus: 'Verified',
-    idVerifiedAt: new Date().toISOString().slice(0, 10),
-    idVerifiedBy: 'HR Admin',
+    idVerifiedAt: '2026-01-15',
+    idVerifiedBy: 'System Administrator',
   },
 ];
 
-// 0 Simulated Attendance History (Clean fresh logs)
+// No attendance logs pre-seeded
 export const generateInitialAttendanceLogs = () => [];
 
 // Standard Company Policy & Payroll Settings
 export const INITIAL_SETTINGS = {
   companyName: 'APEX HRIS Enterprise',
   systemTitle: 'APEX HRIS Enterprise',
+  companyTagline: 'Enterprise Multi-Branch HRIS & Payroll Platform',
+  taxIdNumber: '',
   standardWorkHoursPerDay: 8,
-  gracePeriodMinutes: 15, // 15-minute standard grace period
+  gracePeriodMinutes: 15,
   overtimeMinimumMinutes: 60,
   overtimeRateMultiplier: 1.25,
   nightDiffMultiplier: 1.10,
@@ -128,5 +217,15 @@ export const INITIAL_SETTINGS = {
     startTime: '08:00',
     endTime: '17:00',
     gracePeriodMinutes: 15,
+  },
+  payrollRules: {
+    overtimeMultiplier: 1.25,
+    sssRate: 0.045,
+    pagIbigFixed: 100,
+  },
+  qrSettings: {
+    tokenExpiryDays: 365,
+    kioskAutoResetSeconds: 4,
+    strictBranchValidation: true,
   },
 };

@@ -31,8 +31,13 @@ export const ScanQRPage = () => {
         type: 'success',
       });
     } else {
+      let toastTitle = '❌ Scan Error';
+      if (result.reason === 'EARLY_TIMEOUT_BLOCKED') toastTitle = '⏳ Bawal Pa Mag-Time Out';
+      else if (result.reason === 'ALREADY_COMPLETED') toastTitle = '🚫 Scan Limit Reached';
+      else if (result.reason === 'WRONG_BRANCH') toastTitle = '❌ Access Denied: Wrong Branch';
+
       addToast({
-        title: result.reason === 'WRONG_BRANCH' ? 'Access Denied' : 'Scan Notice',
+        title: toastTitle,
         message: result.message,
         type: 'error',
       });
@@ -147,13 +152,13 @@ export const ScanQRPage = () => {
                   </div>
                   <div className="text-right">
                     <span
-                      className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                      className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
                         scan.action === 'TIME_IN'
                           ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          : 'bg-blue-50 text-blue-700 border-blue-200'
+                          : 'bg-rose-50 text-rose-700 border-rose-200'
                       }`}
                     >
-                      {scan.action === 'TIME_IN' ? 'Time In' : 'Time Out'}
+                      {scan.action === 'TIME_IN' ? '🟢 Time In' : '🔴 Time Out'}
                     </span>
                     <p className="font-mono text-[11px] text-slate-500 mt-0.5">{scan.time}</p>
                   </div>

@@ -1,10 +1,14 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { Camera, CameraOff, RefreshCw, KeyRound, AlertCircle, Sparkles } from 'lucide-react';
 
 export const QRScanner = ({ onScanSuccess, scannerBranchId, isKiosk = false }) => {
   const scannerRef = useRef(null);
-  const [isScanning, setIsScanning] = useState(false);
+  const isScanningRef = useRef(false);
+  const isStartingRef = useRef(false);
+  const lastScannedTimeRef = useRef(0);
+
+  const [uiScanning, setUiScanning] = useState(false);
   const [cameraError, setCameraError] = useState('');
   const [manualIdInput, setManualIdInput] = useState('');
   const [cameras, setCameras] = useState([]);
@@ -14,78 +18,111 @@ export const QRScanner = ({ onScanSuccess, scannerBranchId, isKiosk = false }) =
 
   // Initialize camera list
   useEffect(() => {
+    let mounted = true;
     Html5Qrcode.getCameras()
       .then((devices) => {
+        if (!mounted) return;
         if (devices && devices.length) {
           setCameras(devices);
-          // Prefer back camera if available
-          const backCam = devices.find((d) => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('environment'));
+          const backCam = devices.find(
+            (d) => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('environment')
+          );
           setSelectedCameraId(backCam ? backCam.id : devices[0].id);
         }
       })
       .catch((err) => {
         console.warn('Camera enumeration error:', err);
       });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  const startScanning = async () => {
+  const stopScanning = useCallback(async () => {
+    if (!isScanningRef.current || !scannerRef.current) {
+      isScanningRef.current = false;
+      setUiScanning(false);
+      return;
+    }
+    try {
+      await scannerRef.current.stop();
+    } catch (e) {
+      // ignore
+    } finally {
+      isScanningRef.current = false;
+      setUiScanning(false);
+    }
+  }, []);
+
+  const startScanning = useCallback(async (targetCamId) => {
+    if (isStartingRef.current || isScanningRef.current) return;
+    isStartingRef.current = true;
     setCameraError('');
+
     try {
       if (!scannerRef.current) {
         scannerRef.current = new Html5Qrcode(containerId);
       }
 
-      const cameraId = selectedCameraId || (cameras[0] ? cameras[0].id : { facingMode: 'environment' });
+      const cam = targetCamId || selectedCameraId || { facingMode: 'environment' };
 
       await scannerRef.current.start(
-        cameraId,
+        cam,
         {
           fps: 10,
           qrbox: { width: 250, height: 250 },
           aspectRatio: 1.0,
         },
         (decodedText) => {
-          if (onScanSuccess) {
-            onScanSuccess(decodedText);
+          const now = Date.now();
+          // 2-second debounce between scans
+          if (now - lastScannedTimeRef.current > 2000) {
+            lastScannedTimeRef.current = now;
+            if (onScanSuccess) {
+              onScanSuccess(decodedText);
+            }
           }
         },
-        (errorMessage) => {
-          // ignore scan frame errors
-        }
+        () => {}
       );
 
-      setIsScanning(true);
+      isScanningRef.current = true;
+      setUiScanning(true);
     } catch (err) {
-      console.error('Camera start failure:', err);
-      setCameraError('Camera access denied or unavailable. You may use the manual input fallback below.');
-      setIsScanning(false);
+      console.warn('Camera start error:', err);
+      setCameraError('Camera access denied or unavailable. Use manual input below.');
+      isScanningRef.current = false;
+      setUiScanning(false);
+    } finally {
+      isStartingRef.current = false;
     }
-  };
+  }, [containerId, onScanSuccess, selectedCameraId]);
 
-  const stopScanning = async () => {
-    if (scannerRef.current && isScanning) {
-      try {
-        await scannerRef.current.stop();
-      } catch (e) {
-        console.warn('Error stopping scanner:', e);
-      }
-      setIsScanning(false);
-    }
-  };
-
-  // Auto-start scanner on mount
+  // Auto-start when selectedCameraId is ready
   useEffect(() => {
-    const timer = setTimeout(() => {
-      startScanning();
-    }, 300);
+    if (!selectedCameraId) return;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      if (!cancelled) {
+        await startScanning(selectedCameraId);
+      }
+    }, 400);
 
     return () => {
+      cancelled = true;
       clearTimeout(timer);
-      if (scannerRef.current && scannerRef.current.isScanning) {
-        scannerRef.current.stop().catch(() => {});
-      }
     };
   }, [selectedCameraId]);
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      if (scannerRef.current && isScanningRef.current) {
+        scannerRef.current.stop().catch(() => {});
+        isScanningRef.current = false;
+      }
+    };
+  }, []);
 
   const handleManualSubmit = (e) => {
     e.preventDefault();
@@ -112,14 +149,14 @@ export const QRScanner = ({ onScanSuccess, scannerBranchId, isKiosk = false }) =
             <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-blue-500 rounded-br-lg" />
 
             {/* Animated Laser Beam */}
-            {isScanning && (
+            {uiScanning && (
               <div className="absolute inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-blue-400 to-transparent shadow-lg shadow-blue-400/50 animate-bounce" />
             )}
           </div>
         </div>
 
         {/* Not scanning overlay */}
-        {!isScanning && (
+        {!uiScanning && (
           <div className="absolute inset-0 bg-slate-900/90 flex flex-col items-center justify-center p-6 text-center z-10">
             <CameraOff className="w-12 h-12 text-slate-400 mb-2" />
             <p className="text-sm font-bold text-white">Camera Standby</p>
@@ -127,7 +164,7 @@ export const QRScanner = ({ onScanSuccess, scannerBranchId, isKiosk = false }) =
               {cameraError || 'Click below to activate attendance scanner camera.'}
             </p>
             <button
-              onClick={startScanning}
+              onClick={() => startScanning(selectedCameraId)}
               className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-sm transition flex items-center gap-1.5"
             >
               <Camera className="w-4 h-4" />
@@ -156,7 +193,7 @@ export const QRScanner = ({ onScanSuccess, scannerBranchId, isKiosk = false }) =
           </select>
         )}
 
-        {isScanning ? (
+        {uiScanning ? (
           <button
             onClick={stopScanning}
             className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold flex items-center gap-1.5 transition ml-auto shadow-sm"
@@ -166,7 +203,7 @@ export const QRScanner = ({ onScanSuccess, scannerBranchId, isKiosk = false }) =
           </button>
         ) : (
           <button
-            onClick={startScanning}
+            onClick={() => startScanning(selectedCameraId)}
             className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 transition ml-auto shadow-sm"
           >
             <Camera className="w-3.5 h-3.5" />

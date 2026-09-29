@@ -30,7 +30,7 @@ export const AppLayout = () => {
 
           <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-[11px] font-mono font-bold text-slate-700 shadow-2xs">
             <Code className="w-3.5 h-3.5 text-blue-600" />
-            <span>Devs: LAWRENCE, A & TAZPER</span>
+            <span>Devs: LAWRENCE, TAZPER And Group of KOPS</span>
           </div>
         </footer>
       </div>

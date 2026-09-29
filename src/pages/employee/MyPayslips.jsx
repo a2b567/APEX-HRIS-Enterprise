@@ -3,11 +3,11 @@ import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { computeEmployeePayroll } from '../../utils/payrollCalculator';
-import { FileText, Printer, Calendar, Banknote, Shield } from 'lucide-react';
+import { FileText, Printer, Calendar, Banknote, Shield, QrCode } from 'lucide-react';
 
 export const MyPayslips = () => {
   const { user } = useAuth();
-  const { employees, attendanceLogs, settings } = useData();
+  const { employees, attendanceLogs, settings, getDisbursementStatus } = useData();
 
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [cutoffType, setCutoffType] = useState('1-15');
@@ -20,6 +20,11 @@ export const MyPayslips = () => {
     if (!employee) return null;
     return computeEmployeePayroll(employee, attendanceLogs, cutoffType, selectedMonth, settings);
   }, [employee, attendanceLogs, cutoffType, selectedMonth, settings]);
+
+  const disbStatus = useMemo(() => {
+    if (!employee) return { disbursed: false };
+    return getDisbursementStatus(employee.id, selectedMonth, cutoffType);
+  }, [employee, getDisbursementStatus, selectedMonth, cutoffType]);
 
   const handlePrint = () => {
     window.print();
@@ -166,13 +171,74 @@ export const MyPayslips = () => {
             </div>
           </div>
 
-          {/* Net Pay Grand Box */}
-          <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between">
-            <div>
-              <span className="text-[10px] uppercase font-bold text-emerald-800">Net Take Home Pay</span>
-              <p className="text-xs text-slate-600">Processed for electronic bank transfer</p>
+          {/* Disbursement Status Banner */}
+          <div className={`p-4 rounded-2xl border-2 text-xs ${
+            disbStatus.disbursed
+              ? 'bg-emerald-50 border-emerald-400'
+              : 'bg-amber-50 border-amber-300 border-dashed'
+          }`}>
+            <div className="flex items-start gap-3">
+              <div className={`p-2.5 rounded-xl shrink-0 ${disbStatus.disbursed ? 'bg-emerald-600 text-white' : 'bg-amber-400 text-white'}`}>
+                <Shield className="w-5 h-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={`font-black text-base ${disbStatus.disbursed ? 'text-emerald-800' : 'text-amber-800'}`}>
+                  {disbStatus.disbursed ? '✅ SALARY DISBURSED & PAID' : '⏳ AWAITING SALARY RELEASE'}
+                </p>
+
+                {disbStatus.disbursed ? (
+                  <div className="mt-2 space-y-1">
+                    <p className="text-emerald-700 font-semibold">
+                      Your salary has been officially released and confirmed via QR Badge verification.
+                    </p>
+                    <div className="mt-2 bg-emerald-100 border border-emerald-300 rounded-xl p-3 space-y-1 text-emerald-900">
+                      <div className="flex justify-between">
+                        <span className="text-[10px] uppercase font-bold text-emerald-600">Release Method</span>
+                        <span className="font-bold text-[11px]">{disbStatus.method || 'QR Badge Scan'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-[10px] uppercase font-bold text-emerald-600">Released On</span>
+                        <span className="font-mono text-[11px] font-bold">
+                          {disbStatus.disbursedAt ? new Date(disbStatus.disbursedAt).toLocaleString() : '—'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-[10px] uppercase font-bold text-emerald-600">Released By</span>
+                        <span className="font-semibold text-[11px]">{disbStatus.disbursedBy || 'HR Officer'}</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-2 space-y-1.5">
+                    <p className="text-amber-700">Your salary for this cutoff has not yet been released.</p>
+                    <div className="mt-2 bg-white border border-amber-200 rounded-xl p-3 flex items-start gap-2.5 text-amber-800">
+                      <QrCode className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-bold text-[12px]">Action Required: Present Your QR Badge</p>
+                        <p className="text-[11px] mt-0.5 text-amber-700">
+                          Go to the HR / Payroll counter and present your QR Employee Badge for scanning. Once verified, your salary will be marked as <strong>PAID</strong> and will appear here instantly.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {disbStatus.disbursed && (
+                <span className="font-mono text-[10px] font-black px-2.5 py-1.5 rounded-xl bg-emerald-600 text-white shrink-0 self-start">
+                  ✓ VERIFIED
+                </span>
+              )}
             </div>
-            <div className="font-mono text-2xl font-extrabold text-emerald-600">
+          </div>
+
+          {/* Net Pay Grand Box */}
+          <div className="p-4 rounded-xl bg-slate-900 text-white flex items-center justify-between shadow-sm">
+            <div>
+              <span className="text-[10px] uppercase font-bold text-slate-400">Net Take Home Pay</span>
+              <p className="text-xs text-slate-300">Net total payable for this cutoff</p>
+            </div>
+            <div className="font-mono text-2xl font-extrabold text-emerald-400">
               {formatCurrency(payslip.netPay)}
             </div>
           </div>

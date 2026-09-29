@@ -6,6 +6,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="APEX HRIS Enterprise — Multi-Branch Human Resource Information System, DTR, and Payroll Management" />
     <title>APEX HRIS Enterprise</title>
+
+    <!-- ══ Security Headers (Phase 2.5 – P1) ══ -->
+    <!-- Content Security Policy: restrict resource origins -->
+    <meta http-equiv="Content-Security-Policy"
+          content="default-src 'self'; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' http://localhost:* ws://localhost:*; worker-src 'self' blob:;">
+    <!-- Prevent MIME-type sniffing -->
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <!-- Prevent clickjacking / iframe embedding -->
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <!-- Referrer policy: limit referer header leakage -->
+    <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
+    <!-- Permissions policy: camera only for self (QR scanner), disable mic/geo/payment -->
+    <meta http-equiv="Permissions-Policy" content="camera=(self), microphone=(), geolocation=(), payment=(), usb=()">
+    <!-- Prevent caching of sensitive pages -->
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
   </head>
   <body class="bg-slate-950 text-slate-100 antialiased min-h-screen">
     <div id="root"></div>

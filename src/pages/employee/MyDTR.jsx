@@ -89,32 +89,27 @@ export const MyDTR = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => handlePunch('IN')}
-            disabled={!!todayLog?.timeIn}
-            className={`px-5 py-2.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
-              !todayLog?.timeIn
-                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
-                : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-            }`}
-          >
-            <Clock className="w-4 h-4" />
-            <span>{todayLog?.timeIn ? `Clocked In (${formatTime(todayLog.timeIn)})` : 'Clock In Now'}</span>
-          </button>
-
-          <button
-            onClick={() => handlePunch('OUT')}
-            disabled={!todayLog?.timeIn || !!todayLog?.timeOut}
-            className={`px-5 py-2.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
-              todayLog?.timeIn && !todayLog?.timeOut
-                ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
-                : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-            }`}
-          >
-            <Clock className="w-4 h-4" />
-            <span>{todayLog?.timeOut ? `Clocked Out (${formatTime(todayLog.timeOut)})` : 'Clock Out Now'}</span>
-          </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="bg-slate-50 border border-slate-200/80 px-4 py-2.5 rounded-xl text-xs flex items-center gap-3">
+            <span className="text-slate-500 font-medium">Status:</span>
+            {todayLog?.timeIn && !todayLog?.timeOut ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                <span className="w-2 h-2 rounded-full bg-emerald-600 animate-ping"></span>
+                Clocked In
+              </span>
+            ) : todayLog?.timeIn && todayLog?.timeOut ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-300">
+                Clocked Out
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                Not Clocked In
+              </span>
+            )}
+            <div className="h-4 w-px bg-slate-200 mx-1"></div>
+            <span className="text-slate-500">In: <strong className="text-slate-900 font-mono">{todayLog?.timeIn ? formatTime(todayLog.timeIn) : '— —'}</strong></span>
+            <span className="text-slate-500">Out: <strong className="text-slate-900 font-mono">{todayLog?.timeOut ? formatTime(todayLog.timeOut) : '— —'}</strong></span>
+          </div>
         </div>
       </div>
 

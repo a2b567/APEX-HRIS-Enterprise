@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import { ToastProvider } from './components/shared/Toast';
 import AppRoutes from './routes/AppRoutes';
+import SessionGuard from './security/SessionGuard';
 
 export function App() {
   return (
@@ -11,7 +12,9 @@ export function App() {
       <AuthProvider>
         <DataProvider>
           <ToastProvider>
-            <AppRoutes />
+            <SessionGuard>
+              <AppRoutes />
+            </SessionGuard>
           </ToastProvider>
         </DataProvider>
       </AuthProvider>

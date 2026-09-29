@@ -50,6 +50,7 @@ export const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
         { name: 'Daily Time Record', path: '/supervisor/dtr', icon: Clock },
         { name: 'Branch Payroll', path: '/supervisor/payroll', icon: Banknote },
         { name: 'Reports', path: '/supervisor/reports', icon: BarChart3 },
+        { name: 'Settings', path: '/settings', icon: Settings },
       ];
     } else {
       // EMPLOYEE
@@ -58,6 +59,7 @@ export const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
         { name: 'My QR Badge', path: '/employee/qr', icon: QrCode },
         { name: 'My Attendance', path: '/employee/dtr', icon: Clock },
         { name: 'My Payslips', path: '/employee/payslips', icon: FileText },
+        { name: 'Settings', path: '/settings', icon: Settings },
       ];
     }
   };
@@ -168,7 +170,7 @@ export const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
 
           <div className="flex items-center justify-center gap-1.5 py-1 px-2 rounded-lg bg-navy-800/80 border border-navy-700/60 text-[10px] font-mono font-semibold text-slate-400">
             <Code className="w-3 h-3 text-blue-400" />
-            <span>Devs: LAWRENCE & TAZPER group rene </span>
+            <span>Devs: LAWRENCE & TAZPER Group kops </span>
           </div>
         </div>
       </aside>

@@ -98,6 +98,10 @@ class SoundFeedback {
       console.warn('Audio play error', e);
     }
   }
+  // Aliases for convenience
+  success() { this.playSuccess(); }
+  warning() { this.playWarning(); }
+  error() { this.playError(); }
 }
 
 export const soundFeedback = new SoundFeedback();

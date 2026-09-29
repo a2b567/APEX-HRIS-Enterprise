@@ -223,7 +223,7 @@ export const AppRoutes = () => {
         <Route
           path="settings"
           element={
-            <ProtectedRoute allowedRoles={['SUPER_ADMIN']}>
+            <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'SUPERVISOR', 'EMPLOYEE']}>
               <SettingsModule />
             </ProtectedRoute>
           }

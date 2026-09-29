@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import {
   INITIAL_BRANCHES,
   INITIAL_USERS,
@@ -13,24 +13,57 @@ import { secureStorage } from '../utils/securityUtils';
 
 export const DataContext = createContext(null);
 
-const STORAGE_KEY_DATA = 'dtr_payroll_database_v3_clean';
+// v6_5sup: 5 branches + 5 supervisors seeded
+const STORAGE_KEY_DATA = 'dtr_payroll_database_v6_5sup';
+const OLD_KEY = 'dtr_payroll_database_v3_clean';
+
+// One-time purge of old cache keys on first load
+const purgeOldCache = () => {
+  const oldKeys = [
+    `${OLD_KEY}_branches`, `${OLD_KEY}_employees`, `${OLD_KEY}_users`,
+    `${OLD_KEY}_attendance`, `${OLD_KEY}_settings`, `${OLD_KEY}_scans`,
+    `APEX_ENC_${OLD_KEY}_branches`, `APEX_ENC_${OLD_KEY}_employees`,
+    `APEX_ENC_${OLD_KEY}_users`, `APEX_ENC_${OLD_KEY}_attendance`,
+    `APEX_ENC_${OLD_KEY}_settings`, `APEX_ENC_${OLD_KEY}_scans`,
+    OLD_KEY,
+  ];
+  oldKeys.forEach((k) => localStorage.removeItem(k));
+};
+purgeOldCache();
 
 export const DataProvider = ({ children }) => {
   const [branches, setBranches] = useState(() => {
-    return secureStorage.getItem(`${STORAGE_KEY_DATA}_branches`) || INITIAL_BRANCHES;
+    const saved = secureStorage.getItem(`${STORAGE_KEY_DATA}_branches`) || secureStorage.getItem('dtr_payroll_database_v5_testemp_branches');
+    if (saved && Array.isArray(saved) && saved.length > 0) {
+      const existingIds = new Set(saved.map((b) => b.id));
+      const missing = INITIAL_BRANCHES.filter((b) => !existingIds.has(b.id));
+      return [...saved, ...missing];
+    }
+    return INITIAL_BRANCHES;
   });
 
   const [users, setUsers] = useState(() => {
-    return secureStorage.getItem(`${STORAGE_KEY_DATA}_users`) || INITIAL_USERS;
+    const saved = secureStorage.getItem(`${STORAGE_KEY_DATA}_users`) || secureStorage.getItem('dtr_payroll_database_v5_testemp_users');
+    if (saved && Array.isArray(saved) && saved.length > 0) {
+      const existingIds = new Set(saved.map((u) => u.id));
+      const missing = INITIAL_USERS.filter((u) => !existingIds.has(u.id));
+      return [...saved, ...missing];
+    }
+    return INITIAL_USERS;
   });
 
   const [employees, setEmployees] = useState(() => {
-    return secureStorage.getItem(`${STORAGE_KEY_DATA}_employees`) || INITIAL_EMPLOYEES;
+    return secureStorage.getItem(`${STORAGE_KEY_DATA}_employees`) || secureStorage.getItem('dtr_payroll_database_v5_testemp_employees') || INITIAL_EMPLOYEES;
   });
 
   const [attendanceLogs, setAttendanceLogs] = useState(() => {
     return secureStorage.getItem(`${STORAGE_KEY_DATA}_attendance`) || generateInitialAttendanceLogs();
   });
+
+  const attendanceLogsRef = useRef(attendanceLogs);
+  useEffect(() => {
+    attendanceLogsRef.current = attendanceLogs;
+  }, [attendanceLogs]);
 
   const [settings, setSettings] = useState(() => {
     const saved = secureStorage.getItem(`${STORAGE_KEY_DATA}_settings`);
@@ -43,6 +76,11 @@ export const DataProvider = ({ children }) => {
   // Real-time scan telemetry feed for dashboards (fresh empty state)
   const [liveScanFeed, setLiveScanFeed] = useState(() => {
     return secureStorage.getItem(`${STORAGE_KEY_DATA}_scans`) || [];
+  });
+
+  // Payroll Disbursement Records Map (key: `${employeeId}_${selectedMonth}_${cutoffType}`)
+  const [disbursements, setDisbursements] = useState(() => {
+    return secureStorage.getItem(`${STORAGE_KEY_DATA}_disbursements`) || {};
   });
 
   // Save changes with AES-256 encrypted storage
@@ -69,6 +107,10 @@ export const DataProvider = ({ children }) => {
   useEffect(() => {
     secureStorage.setItem(`${STORAGE_KEY_DATA}_scans`, liveScanFeed);
   }, [liveScanFeed]);
+
+  useEffect(() => {
+    secureStorage.setItem(`${STORAGE_KEY_DATA}_disbursements`, disbursements);
+  }, [disbursements]);
 
   // Reset database back to clean seed
   const resetToFactoryDefaults = () => {
@@ -574,13 +616,23 @@ export const DataProvider = ({ children }) => {
       };
     }
 
-    const employee = employees.find((e) => e.id === parsed.employeeId);
+    const searchTarget = String(parsed.employeeId).trim().toLowerCase();
+    const employee = employees.find((e) => {
+      const matchId = e.id && e.id.toLowerCase() === searchTarget;
+      const matchEmpCode = e.employeeId && e.employeeId.toLowerCase() === searchTarget;
+      const matchUserId = e.userId && String(e.userId) === searchTarget;
+      const matchName = e.name && e.name.toLowerCase() === searchTarget;
+      const matchToken = e.qrToken && e.qrToken.toLowerCase() === searchTarget;
+      const matchIncludes = e.id && searchTarget.includes(e.id.toLowerCase());
+      return matchId || matchEmpCode || matchUserId || matchName || matchToken || matchIncludes;
+    });
+
     if (!employee) {
-      soundFeedback.playError();
+      try { soundFeedback.playError(); } catch (e) {}
       return {
         success: false,
         reason: 'EMPLOYEE_NOT_FOUND',
-        message: `Employee ID (${parsed.employeeId}) is not registered in the system.`,
+        message: `Employee (${parsed.employeeId}) is not registered in the system.`,
       };
     }
 
@@ -598,15 +650,23 @@ export const DataProvider = ({ children }) => {
     }
 
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
+    const localYear = now.getFullYear();
+    const localMonth = String(now.getMonth() + 1).padStart(2, '0');
+    const localDay = String(now.getDate()).padStart(2, '0');
+    const todayStr = `${localYear}-${localMonth}-${localDay}`;
     const timeHHMM = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
     const displayTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
-    const existingIndex = attendanceLogs.findIndex(
-      (log) => log.employeeId === employee.id && log.date === todayStr
+    // Look up in synchronous ref
+    const currentLogs = [...(attendanceLogsRef.current || [])];
+    const existingIndex = currentLogs.findIndex(
+      (log) =>
+        log &&
+        (log.employeeId === employee.id || String(log.employeeId).toLowerCase() === String(employee.id).toLowerCase()) &&
+        log.date === todayStr
     );
 
-    const existingLog = existingIndex >= 0 ? attendanceLogs[existingIndex] : null;
+    const existingLog = existingIndex >= 0 ? currentLogs[existingIndex] : null;
 
     // Case 1: No Time In recorded yet today -> Record Time In
     if (!existingLog || !existingLog.timeIn) {
@@ -632,15 +692,16 @@ export const DataProvider = ({ children }) => {
         isManual: false,
       };
 
+      let nextLogs;
       if (existingIndex >= 0) {
-        setAttendanceLogs((prev) => {
-          const clone = [...prev];
-          clone[existingIndex] = { ...clone[existingIndex], ...newLog };
-          return clone;
-        });
+        nextLogs = [...currentLogs];
+        nextLogs[existingIndex] = { ...nextLogs[existingIndex], ...newLog };
       } else {
-        setAttendanceLogs((prev) => [newLog, ...prev]);
+        nextLogs = [newLog, ...currentLogs];
       }
+
+      attendanceLogsRef.current = nextLogs;
+      setAttendanceLogs(nextLogs);
 
       // Add to live telemetry feed
       const scanEntry = {
@@ -657,9 +718,9 @@ export const DataProvider = ({ children }) => {
       setLiveScanFeed((prev) => [scanEntry, ...prev.slice(0, 19)]);
 
       if (status === 'Late') {
-        soundFeedback.playWarning();
+        try { soundFeedback.playWarning(); } catch (e) {}
       } else {
-        soundFeedback.playSuccess();
+        try { soundFeedback.playSuccess(); } catch (e) {}
       }
 
       return {
@@ -669,12 +730,31 @@ export const DataProvider = ({ children }) => {
         time: displayTime,
         lateMinutes: calc.lateMinutes,
         employee,
-        message: `Time In recorded at ${displayTime} (${status === 'Late' ? `${calc.lateMinutes}m Late` : 'On Time'})`,
+        message: `🟢 TIME IN: Na-record ang Time In ni ${employee.name} (${displayTime}) - ${status === 'Late' ? `${calc.lateMinutes}m Late` : 'On Time'}.`,
       };
     }
 
     // Case 2: Has Time In, but no Time Out -> Record Time Out
     if (existingLog.timeIn && !existingLog.timeOut) {
+      // ── Shift Schedule Time Out Verification ──
+      const shiftEndTime = settings.defaultShift?.endTime || '17:00';
+      const [nowH, nowM] = timeHHMM.split(':').map(Number);
+      const [shiftEndH, shiftEndM] = shiftEndTime.split(':').map(Number);
+      const currentTotalM = nowH * 60 + nowM;
+      const shiftEndTotalM = shiftEndH * 60 + shiftEndM;
+
+      // Check if current time is earlier than scheduled dismissal time
+      if (currentTotalM < shiftEndTotalM) {
+        try { soundFeedback.playError(); } catch (e) {}
+        const formattedEndTime = shiftEndTime === '17:00' ? '05:00 PM' : shiftEndTime;
+        return {
+          success: false,
+          reason: 'EARLY_TIMEOUT_BLOCKED',
+          employee,
+          message: `🚫 BAWAL PA MAG-TIME OUT: Hindi pa oras ng dismissal (${formattedEndTime}). Ang kasalukuyang oras pa lamang ay ${displayTime}. Mangyaring mag-scan sa tamang oras ng labasan.`,
+        };
+      }
+
       const calc = calculateTimeEntry(existingLog.timeIn, timeHHMM, existingLog.breakMinutes || 60, settings.defaultShift);
 
       const updatedRecord = {
@@ -688,11 +768,10 @@ export const DataProvider = ({ children }) => {
         remarks: 'QR Badge Check-Out',
       };
 
-      setAttendanceLogs((prev) => {
-        const clone = [...prev];
-        clone[existingIndex] = updatedRecord;
-        return clone;
-      });
+      const nextLogs = [...currentLogs];
+      nextLogs[existingIndex] = updatedRecord;
+      attendanceLogsRef.current = nextLogs;
+      setAttendanceLogs(nextLogs);
 
       const scanEntry = {
         id: `scan-${Date.now()}`,
@@ -707,7 +786,7 @@ export const DataProvider = ({ children }) => {
       };
       setLiveScanFeed((prev) => [scanEntry, ...prev.slice(0, 19)]);
 
-      soundFeedback.playSuccess();
+      try { soundFeedback.playSuccess(); } catch (e) {}
 
       return {
         success: true,
@@ -717,17 +796,17 @@ export const DataProvider = ({ children }) => {
         totalHours: calc.regularHours,
         overtimeHours: calc.overtimeHours,
         employee,
-        message: `Time Out recorded at ${displayTime}. Total worked: ${calc.regularHours} hrs${calc.overtimeHours > 0 ? ` (+${calc.overtimeHours}h OT)` : ''}`,
+        message: `🔴 TIME OUT: Na-record ang Time Out ni ${employee.name} (${displayTime}). Total rendered: ${calc.regularHours} hrs${calc.overtimeHours > 0 ? ` (+${calc.overtimeHours}h OT)` : ''}.`,
       };
     }
 
-    // Case 3: Both Time In and Time Out already completed
-    soundFeedback.playWarning();
+    // Case 3: Both Time In and Time Out already completed -> STRICT ERROR / BLOCKED
+    try { soundFeedback.playError(); } catch (e) {}
     return {
       success: false,
       reason: 'ALREADY_COMPLETED',
       employee,
-      message: `Employee ${employee.name} has already completed both Time In and Time Out for today.`,
+      message: `🚫 BAWAL NA I-SCAN: Nakapag-Time In (${existingLog.timeIn}) at Time Out (${existingLog.timeOut}) na si ${employee.name} ngayong araw. (Isang IN at isang OUT lang bawat araw!)`,
     };
   };
 
@@ -908,6 +987,96 @@ export const DataProvider = ({ children }) => {
     return { success: true, user: updatedUser };
   };
 
+  /**
+   * PAYROLL DISBURSEMENT & QR SCAN VERIFICATION
+   */
+  const markPayrollDisbursed = (employeeId, selectedMonth, cutoffType, method = 'Manual Check / QR', verifiedBy = 'Authorized Officer') => {
+    const key = `${employeeId}_${selectedMonth}_${cutoffType}`;
+    const now = new Date().toISOString();
+    const record = {
+      disbursed: true,
+      disbursedAt: now,
+      disbursedBy: verifiedBy,
+      method,
+    };
+    setDisbursements((prev) => ({
+      ...prev,
+      [key]: record,
+    }));
+    return { success: true, record };
+  };
+
+  const togglePayrollDisbursement = (employeeId, selectedMonth, cutoffType, verifiedBy = 'Authorized Officer') => {
+    const key = `${employeeId}_${selectedMonth}_${cutoffType}`;
+    const existing = disbursements[key];
+    if (existing?.disbursed) {
+      setDisbursements((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      return { success: true, disbursed: false, message: 'Status reset to Pending Disbursement.' };
+    } else {
+      return markPayrollDisbursed(employeeId, selectedMonth, cutoffType, 'Manual Action', verifiedBy);
+    }
+  };
+
+  const disbursePayrollByQR = (qrString, selectedMonth, cutoffType, verifiedBy = 'Supervisor / HR') => {
+    const parsed = parseQRPayload(qrString);
+    if (!parsed.success || !parsed.employeeId) {
+      try { soundFeedback.playError(); } catch (e) {}
+      return { success: false, message: parsed.error || 'Invalid QR code badge.' };
+    }
+
+    const searchTarget = String(parsed.employeeId).trim().toLowerCase();
+    const emp = employees.find((e) => {
+      const matchId = e.id && e.id.toLowerCase() === searchTarget;
+      const matchEmpCode = e.employeeId && e.employeeId.toLowerCase() === searchTarget;
+      const matchUserId = e.userId && String(e.userId) === searchTarget;
+      const matchName = e.name && e.name.toLowerCase() === searchTarget;
+      const matchToken = e.qrToken && e.qrToken.toLowerCase() === searchTarget;
+      // partial ID match (e.g. EMP-001-01 matches EMP-001-01-BRANCH-001)
+      const matchIncludes = e.id && searchTarget.includes(e.id.toLowerCase());
+      return matchId || matchEmpCode || matchUserId || matchName || matchToken || matchIncludes;
+    });
+
+    if (!emp) {
+      try { soundFeedback.playError(); } catch (e) {}
+      return { success: false, message: `Employee record (${parsed.employeeId}) not found.` };
+    }
+
+    // ── STRICT ONE-TIME SCAN CHECK ──
+    const key = `${emp.id}_${selectedMonth}_${cutoffType}`;
+    const existing = disbursements[key];
+    if (existing?.disbursed) {
+      try { soundFeedback.playWarning(); } catch (e) {}
+      const timeStr = existing.disbursedAt ? new Date(existing.disbursedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'earlier';
+      const dateStr = existing.disbursedAt ? new Date(existing.disbursedAt).toLocaleDateString() : '';
+      return {
+        success: false,
+        alreadyDisbursed: true,
+        employee: emp,
+        record: existing,
+        message: `⚠️ Bawal na i-scan ulit: Ang sahod ni ${emp.name} (${emp.id}) ay NAIBIGAY AT NAI-DISBURSE NA noong ${dateStr} ${timeStr} ni ${existing.disbursedBy || 'HR'}. (One-time scan only per cutoff)`,
+      };
+    }
+
+    const res = markPayrollDisbursed(emp.id, selectedMonth, cutoffType, 'QR Code Badge Scan', verifiedBy);
+    try { soundFeedback.playSuccess(); } catch (e) {}
+
+    return {
+      success: true,
+      employee: emp,
+      record: res.record,
+      message: `Salary for ${emp.name} (${emp.id}) successfully verified & marked DISBURSED via QR Badge Scan!`,
+    };
+  };
+
+  const getDisbursementStatus = (employeeId, selectedMonth, cutoffType) => {
+    const key = `${employeeId}_${selectedMonth}_${cutoffType}`;
+    return disbursements[key] || { disbursed: false };
+  };
+
   return (
     <DataContext.Provider
       value={{
@@ -918,6 +1087,11 @@ export const DataProvider = ({ children }) => {
         attendanceLogs,
         settings,
         liveScanFeed,
+        disbursements,
+        markPayrollDisbursed,
+        togglePayrollDisbursement,
+        disbursePayrollByQR,
+        getDisbursementStatus,
         reassignSupervisorToBranch,
         addBranch,
         updateBranch,
