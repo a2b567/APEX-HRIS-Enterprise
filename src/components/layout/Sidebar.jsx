@@ -74,9 +74,8 @@ export const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
       )}
 
       <aside
-        className={`fixed top-0 left-0 z-40 h-screen w-64 flex flex-col bg-navy-850 border-r border-navy-700 transition-transform duration-300 ease-in-out lg:translate-x-0 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        className={`fixed top-0 left-0 z-40 h-screen w-64 flex flex-col bg-navy-850 border-r border-navy-700 transition-transform duration-300 ease-in-out lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
       >
         {/* Brand Header */}
         <div className="flex h-16 items-center justify-between border-b border-navy-700/80 px-6">
@@ -108,10 +107,10 @@ export const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
             </div>
             <p className="mt-0.5 text-xs font-bold text-white truncate">
               {role === 'SUPER_ADMIN'
-                ? '🏢 All Branches (Global)'
+                ? '🏢 All Branches'
                 : userBranch
-                ? `📍 ${userBranch.name}`
-                : 'Personal Portal'}
+                  ? `📍 ${userBranch.name}`
+                  : 'Personal Portal'}
             </p>
           </div>
         </div>
@@ -130,27 +129,24 @@ export const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                 key={item.path}
                 to={item.path}
                 onClick={() => setSidebarOpen(false)}
-                className={`flex items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold transition-all duration-150 ${
-                  isActive
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 font-bold'
-                    : item.highlight
+                className={`flex items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold transition-all duration-150 ${isActive
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 font-bold'
+                  : item.highlight
                     ? 'bg-blue-500/10 text-blue-300 border border-blue-500/30 hover:bg-blue-500/20'
                     : 'text-slate-300 hover:bg-navy-700/60 hover:text-white'
-                }`}
+                  }`}
               >
                 <div className="flex items-center gap-3">
                   <Icon
-                    className={`h-4.5 w-4.5 ${
-                      isActive ? 'text-white' : item.highlight ? 'text-blue-400' : 'text-slate-400'
-                    }`}
+                    className={`h-4.5 w-4.5 ${isActive ? 'text-white' : item.highlight ? 'text-blue-400' : 'text-slate-400'
+                      }`}
                   />
                   <span>{item.name}</span>
                 </div>
                 {item.badge && (
                   <span
-                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                      isActive ? 'bg-white/20 text-white' : 'bg-navy-700 text-slate-300'
-                    }`}
+                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${isActive ? 'bg-white/20 text-white' : 'bg-navy-700 text-slate-300'
+                      }`}
                   >
                     {item.badge}
                   </span>
@@ -172,7 +168,7 @@ export const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
 
           <div className="flex items-center justify-center gap-1.5 py-1 px-2 rounded-lg bg-navy-800/80 border border-navy-700/60 text-[10px] font-mono font-semibold text-slate-400">
             <Code className="w-3 h-3 text-blue-400" />
-            <span>Devs: LAWRENCE, A & TAZPER</span>
+            <span>Devs: LAWRENCE & TAZPER group rene </span>
           </div>
         </div>
       </aside>

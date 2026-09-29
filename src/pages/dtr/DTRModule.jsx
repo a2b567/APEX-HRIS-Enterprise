@@ -197,7 +197,7 @@ export const DTRModule = () => {
               Daily Time Record
             </span>
             <span className="text-xs text-slate-500 font-medium">
-              {isSuperAdmin ? 'Enterprise Scope (5 Branches)' : `Branch: ${user?.branchId || 'Personal'}`}
+              {isSuperAdmin ? 'Enterprise Scope (All Branches)' : `Branch: ${user?.branchId || 'Personal'}`}
             </span>
           </div>
           <h1 className="mt-1 text-2xl font-bold text-slate-900 tracking-tight">Daily Time Record (DTR)</h1>

@@ -111,7 +111,7 @@ export const ReportsModule = () => {
               Intelligence & Analytics
             </span>
             <span className="text-xs text-slate-500 font-medium">
-              {isSuperAdmin ? 'Enterprise Consolidated (5 Branches)' : `Branch Scope: ${supervisorBranchId}`}
+              {isSuperAdmin ? 'Enterprise Consolidated (All Branches)' : `Branch Scope: ${supervisorBranchId}`}
             </span>
           </div>
           <h1 className="mt-1 text-2xl font-bold text-slate-900 tracking-tight">Reports & Insights</h1>
@@ -128,7 +128,7 @@ export const ReportsModule = () => {
               onChange={(e) => setSelectedBranch(e.target.value)}
               className="w-full py-2 px-3 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-blue-500 font-medium shadow-sm"
             >
-              <option value="ALL">All 5 Branches (Consolidated)</option>
+              <option value="ALL">All Branches (Consolidated)</option>
               {branches.map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.name} ({b.code})
@@ -203,7 +203,7 @@ export const ReportsModule = () => {
 
         {/* Cross-Branch Comparative Bar Chart */}
         <div className="rounded-2xl bg-white border border-slate-200/80 p-6 shadow-sm">
-          <h3 className="text-sm font-bold text-slate-900 mb-1">5-Branch Payroll Expense Distribution</h3>
+          <h3 className="text-sm font-bold text-slate-900 mb-1">Branch Payroll Expense Distribution</h3>
           <p className="text-xs text-slate-500 mb-4">Estimated net disbursement comparison across branches</p>
 
           <div className="h-64 w-full">

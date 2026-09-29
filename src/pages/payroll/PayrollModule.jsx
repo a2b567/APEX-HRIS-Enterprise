@@ -196,7 +196,7 @@ export const PayrollModule = () => {
               Automated Payroll Engine
             </span>
             <span className="text-xs text-slate-500 font-medium">
-              {isSuperAdmin ? 'Enterprise Consolidated (All 5 Branches)' : `Branch: ${supervisorBranchId}`}
+              {isSuperAdmin ? 'Enterprise Consolidated (All Branches)' : `Branch: ${supervisorBranchId}`}
             </span>
           </div>
           <h1 className="mt-1 text-2xl font-bold text-slate-900 tracking-tight">Payroll Ledger & Payslips</h1>
@@ -257,7 +257,7 @@ export const PayrollModule = () => {
               onChange={(e) => setBranchFilter(e.target.value)}
               className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
             >
-              <option value="ALL">All 5 Branches (Consolidated)</option>
+              <option value="ALL">All Branches (Consolidated)</option>
               {branches.map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.name} ({b.code})
@@ -285,13 +285,13 @@ export const PayrollModule = () => {
         </div>
       </div>
 
-      {/* Super Admin: 5-Branch Payroll Breakdown Cards */}
+      {/* Super Admin: Branch Payroll Breakdown Cards */}
       {isSuperAdmin && branchFilter === 'ALL' && (
         <div className="no-print space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
               <Building2 className="w-4 h-4 text-blue-600" />
-              <span>5-Branch Payroll Summary Breakdown</span>
+              <span>Branch Payroll Summary Breakdown</span>
             </h3>
           </div>
 

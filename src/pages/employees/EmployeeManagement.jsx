@@ -258,7 +258,7 @@ export const EmployeeManagement = () => {
               Workforce Directory
             </span>
             <span className="text-xs text-slate-500 font-medium">
-              {isSuperAdmin ? 'Enterprise Scope (All 5 Branches)' : `Branch Scope: ${supervisorBranchId}`}
+              {isSuperAdmin ? 'Enterprise Scope (All Branches)' : `Branch Scope: ${supervisorBranchId}`}
             </span>
           </div>
           <h1 className="mt-1 text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
@@ -540,7 +540,7 @@ export const EmployeeManagement = () => {
           isOpen={modalOpen}
           onClose={() => setModalOpen(false)}
           title={editingEmployee ? `Edit Employee: ${editingEmployee.name}` : 'Register New Employee'}
-          subtitle={isSuperAdmin ? 'Assign to any of the 5 branches' : `Assigned to ${supervisorBranchId}`}
+          subtitle={isSuperAdmin ? 'Assign to any branch' : `Assigned to ${supervisorBranchId}`}
           maxWidth="max-w-2xl"
         >
           <form onSubmit={handleSubmit} className="space-y-4">

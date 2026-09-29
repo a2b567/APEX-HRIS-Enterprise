@@ -337,7 +337,7 @@ export const AdminDashboard = () => {
             <div>
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <Building2 className="w-5 h-5 text-blue-600" />
-                <span>5-Branch Operations Matrix</span>
+                <span>Branch Operations Matrix</span>
               </h3>
               <p className="text-xs text-slate-500">1 Supervisor strictly assigned per branch</p>
             </div>

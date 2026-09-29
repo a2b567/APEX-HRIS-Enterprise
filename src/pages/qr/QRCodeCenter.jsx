@@ -86,7 +86,7 @@ export const QRCodeCenter = () => {
               Badge Management Hub
             </span>
             <span className="text-xs text-slate-500 font-medium">
-              {isSuperAdmin ? 'Consolidated All 5 Branches' : `Branch: ${supervisorBranchId}`}
+              {isSuperAdmin ? 'Consolidated All Branches' : `Branch: ${supervisorBranchId}`}
             </span>
           </div>
           <h1 className="mt-1 text-2xl font-bold text-slate-900 tracking-tight">QR Code Badge Center</h1>
