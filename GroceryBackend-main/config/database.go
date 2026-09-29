@@ -57,6 +57,9 @@ func LoadDatabaseConfig() *DatabaseConfig {
 }
 
 func (c *DatabaseConfig) GetDSN() string {
+	if dbURL := os.Getenv("DATABASE_URL"); dbURL != "" {
+		return dbURL
+	}
 	return fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=%s",
 		c.Host, c.User, c.Password, c.DBName, c.Port, c.SSLMode, c.TimeZone)
 }
