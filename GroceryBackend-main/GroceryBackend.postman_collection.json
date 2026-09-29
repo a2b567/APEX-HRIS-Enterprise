@@ -1,0 +1,705 @@
+{
+	"info": {
+		"_postman_id": "8f7e2a1b-3c4d-4e5f-9a0b-1c2d3e4f5a6b",
+		"name": "Grocery Backend API (Go Fiber)",
+		"description": "Complete Postman collection for testing the Grocery Backend (Authentication, Branches, Employees, QR Timekeeping, Schedules, Salary, Payroll, Payslip PDF, and Audit Logs).",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{token}}",
+				"type": "string"
+			}
+		]
+	},
+	"item": [
+		{
+			"name": "0. Health & Status",
+			"item": [
+				{
+					"name": "Root Welcome",
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/",
+							"host": ["{{baseUrl}}"],
+							"path": [""]
+						}
+					}
+				},
+				{
+					"name": "Health Check",
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["health"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "1. Authentication",
+			"item": [
+				{
+					"name": "Login (Super Admin)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var res = pm.response.json();",
+									"    if (res.data && res.data.token) {",
+									"        pm.environment.set('token', res.data.token);",
+									"        console.log('JWT Token successfully saved to environment!');",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"admin\",\n    \"password\": \"admin123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/login",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "login"]
+						}
+					}
+				},
+				{
+					"name": "Login (Custom User)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var res = pm.response.json();",
+									"    if (res.data && res.data.token) {",
+									"        pm.environment.set('token', res.data.token);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"supervisor1\",\n    \"password\": \"super123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/login",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "login"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "2. Branches",
+			"item": [
+				{
+					"name": "Get All Branches",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/branches",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "branches"]
+						}
+					}
+				},
+				{
+					"name": "Create New Branch",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"branch_code\": \"BR-EAST\",\n    \"branch_name\": \"East District Grocery Outlet\",\n    \"address\": \"789 East Avenue, Pasig City\",\n    \"phone\": \"+63 2 8555 1234\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/branches",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "branches"]
+						}
+					}
+				},
+				{
+					"name": "Update Branch",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"branch_name\": \"East District Grocery Supercenter\",\n    \"phone\": \"+63 2 8555 9999\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/branches/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "branches", "1"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "3. Users & Supervisors",
+			"item": [
+				{
+					"name": "Get All Users",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/users",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "users"]
+						}
+					}
+				},
+				{
+					"name": "Create Supervisor User",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"supervisor1\",\n    \"password\": \"super123\",\n    \"branch_id\": 1\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/users/supervisor",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "users", "supervisor"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "4. Employees",
+			"item": [
+				{
+					"name": "Get All Employees",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/employees",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "employees"]
+						}
+					}
+				},
+				{
+					"name": "Register Employee",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var res = pm.response.json();",
+									"    if (res.data) {",
+									"        if (res.data.employee_id) pm.environment.set('employee_id', res.data.employee_id);",
+									"        if (res.data.qr_token) pm.environment.set('qr_token', res.data.qr_token);",
+									"        console.log('Saved employee_id and qr_token to environment!');",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"jdelacruz\",\n    \"password\": \"pass1234\",\n    \"first_name\": \"Juan\",\n    \"last_name\": \"Dela Cruz\",\n    \"email\": \"juan.delacruz@example.com\",\n    \"phone\": \"09171234567\",\n    \"position\": \"Cashier\",\n    \"department\": \"Front Store\",\n    \"branch_id\": 1,\n    \"monthly_rate\": 18000.00\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/employees",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "employees"]
+						}
+					}
+				},
+				{
+					"name": "Get Employee by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/employees/{{employee_id}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "employees", "{{employee_id}}"]
+						}
+					}
+				},
+				{
+					"name": "Update Employee",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"position\": \"Senior Cashier\",\n    \"phone\": \"09179998888\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/employees/{{employee_id}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "employees", "{{employee_id}}"]
+						}
+					}
+				},
+				{
+					"name": "Get Employee QR Token",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/employees/{{employee_id}}/qr",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "employees", "{{employee_id}}", "qr"]
+						}
+					}
+				},
+				{
+					"name": "Deactivate Employee",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/employees/{{employee_id}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "employees", "{{employee_id}}"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "5. QR Scanner",
+			"item": [
+				{
+					"name": "Scan QR Token",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"qr_token\": \"{{qr_token}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/qr/scan",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "qr", "scan"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "6. Attendance (Timekeeping)",
+			"item": [
+				{
+					"name": "Time In",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"qr_token\": \"{{qr_token}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/attendance/time-in",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "attendance", "time-in"]
+						}
+					}
+				},
+				{
+					"name": "Time Out",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"qr_token\": \"{{qr_token}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/attendance/time-out",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "attendance", "time-out"]
+						}
+					}
+				},
+				{
+					"name": "Get Attendance Records",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/attendance",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "attendance"]
+						}
+					}
+				},
+				{
+					"name": "Get Attendance by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/attendance/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "attendance", "1"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "7. Schedules",
+			"item": [
+				{
+					"name": "Get Employee Schedule",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/schedules/{{employee_id}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "schedules", "{{employee_id}}"]
+						}
+					}
+				},
+				{
+					"name": "Create Shift Schedule",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"employee_id\": {{employee_id}},\n    \"day_of_week\": 1,\n    \"scheduled_in\": \"08:00\",\n    \"scheduled_out\": \"17:00\",\n    \"break_minutes\": 60,\n    \"is_rest_day\": false\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/schedules",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "schedules"]
+						}
+					}
+				},
+				{
+					"name": "Update Schedule",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"scheduled_in\": \"07:30\",\n    \"scheduled_out\": \"16:30\",\n    \"break_minutes\": 60,\n    \"is_rest_day\": false\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/schedules/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "schedules", "1"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "8. Salary Profiles",
+			"item": [
+				{
+					"name": "Get Salary Profile",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/salary/{{employee_id}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "salary", "{{employee_id}}"]
+						}
+					}
+				},
+				{
+					"name": "Create Salary Profile",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"employee_id\": {{employee_id}},\n    \"monthly_rate\": 20000.00,\n    \"working_days_per_month\": 26,\n    \"tax_exempt\": false\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/salary",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "salary"]
+						}
+					}
+				},
+				{
+					"name": "Update Salary Profile",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"monthly_rate\": 22000.00,\n    \"working_days_per_month\": 26,\n    \"tax_exempt\": false\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/salary/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "salary", "1"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "9. Payroll",
+			"item": [
+				{
+					"name": "Generate Draft Payroll",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var res = pm.response.json();",
+									"    if (res.data && res.data.length > 0) {",
+									"        pm.environment.set('payroll_id', res.data[0].id);",
+									"        console.log('Saved payroll_id: ' + res.data[0].id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"branch_id\": 1,\n    \"period_start\": \"2026-09-01\",\n    \"period_end\": \"2026-09-15\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/payroll",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "payroll"]
+						}
+					}
+				},
+				{
+					"name": "Get All Payrolls",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/payroll",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "payroll"]
+						}
+					}
+				},
+				{
+					"name": "Get Payroll by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/payroll/{{payroll_id}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "payroll", "{{payroll_id}}"]
+						}
+					}
+				},
+				{
+					"name": "Finalize Payroll & Generate Payslip",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/payroll/{{payroll_id}}/finalize",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "payroll", "{{payroll_id}}", "finalize"]
+						}
+					}
+				},
+				{
+					"name": "Mark Payroll as Paid",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/payroll/{{payroll_id}}/paid",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "payroll", "{{payroll_id}}", "paid"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "10. Payslips",
+			"item": [
+				{
+					"name": "Get All Payslips",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/payslips",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "payslips"]
+						}
+					}
+				},
+				{
+					"name": "Get Payslip Details",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/payslips/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "payslips", "1"]
+						}
+					}
+				},
+				{
+					"name": "Download Payslip PDF",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/payslips/1/pdf",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "payslips", "1", "pdf"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "11. Reports & Audits",
+			"item": [
+				{
+					"name": "Get Attendance Report",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/reports/attendance?start_date=2026-09-01&end_date=2026-09-30",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "reports", "attendance"],
+							"query": [
+								{ "key": "start_date", "value": "2026-09-01" },
+								{ "key": "end_date", "value": "2026-09-30" }
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Payroll Report",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/reports/payroll?start_date=2026-09-01&end_date=2026-09-30",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "reports", "payroll"],
+							"query": [
+								{ "key": "start_date", "value": "2026-09-01" },
+								{ "key": "end_date", "value": "2026-09-30" }
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Audit Logs",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/audit-logs?limit=50&offset=0",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "audit-logs"],
+							"query": [
+								{ "key": "limit", "value": "50" },
+								{ "key": "offset", "value": "0" }
+							]
+						}
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080",
+			"type": "string"
+		}
+	]
+}
