@@ -59,7 +59,7 @@ export const AuthProvider = ({ children }) => {
             setLoading(false);
             return {
               success: false,
-              message: `Maling account role ang napili. Ang account na ito ay hindi pang-${expectedRole.toLowerCase()}.`,
+              message: `Access denied. The selected role does not match this account.`,
             };
           }
         }
@@ -138,7 +138,7 @@ export const AuthProvider = ({ children }) => {
         await auditLogger.log('LOGIN_FAILED', { username, reason: `Role mismatch: selected ${selectedRoleName}, actual ${actualRoleName}` });
         return {
           success: false,
-          message: `Hindi pwedeng mag-login. Naka-select ang "${selectedRoleName}" role pero ang account na ito ay pang-${actualRoleName}. Piliin ang tamang role sa itaas.`,
+          message: `Unable to sign in. The "${selectedRoleName}" role is selected, but this account is registered as an ${actualRoleName}. Please select the correct role above.`,
         };
       }
     }
