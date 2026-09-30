@@ -71,7 +71,7 @@ export const DataProvider = ({ children }) => {
   const [settings, setSettings] = useState(() => {
     const saved = secureStorage.getItem(`${STORAGE_KEY_DATA}_settings`);
     if (saved && (saved.companyName === 'Northstar Works' || !saved.companyName)) {
-      return { ...saved, companyName: 'REDMART HRIS Enterprise', systemTitle: 'REDMART HRIS Enterprise' };
+      return { ...saved, companyName: 'REDMART Enterprise', systemTitle: 'REDMART Enterprise' };
     }
     return saved || INITIAL_SETTINGS;
   });

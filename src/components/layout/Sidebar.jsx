@@ -87,7 +87,7 @@ export const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
             </div>
             <div>
               <h1 className="text-base font-black tracking-tight text-white leading-tight">
-                REDMART <span className="text-blue-400">HRIS</span>
+                REDMART
               </h1>
               <p className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">
                 Enterprise Platform

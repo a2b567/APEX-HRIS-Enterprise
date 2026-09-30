@@ -57,7 +57,7 @@ export const QRCodeBadge = ({ employee, branch, onRegenerate }) => {
             </div>
             <div>
               <p className="text-[11px] font-bold uppercase tracking-wider text-slate-900 leading-tight">
-                REDMART HRIS Enterprise
+                REDMART Enterprise
               </p>
               <p className="text-[10px] text-slate-400 font-medium">Digital ID & Attendance</p>
             </div>
