@@ -33,16 +33,19 @@ export const syncUserToSupabase = async (userObj) => {
       .upsert(
         {
           id: userObj.id,
+          role: userObj.role || 'EMPLOYEE',
           username: userObj.username,
+          password: userObj.password || 'hashed_Emp@123',
           name: userObj.name,
           email: userObj.email || null,
-          role: userObj.role,
+          position: userObj.position || null,
           branch_id: userObj.branchId || null,
           employee_id: userObj.employeeId || null,
-          password_hash: userObj.password || null,
+          phone: userObj.phone || null,
+          status: userObj.status || 'Active',
           updated_at: new Date().toISOString(),
         },
-        { onConflict: 'id' }
+        { onConflict: 'username' }
       )
       .select()
       .single();
@@ -69,16 +72,18 @@ export const fetchUsersFromSupabase = async () => {
       console.warn('[Supabase] fetchUsersFromSupabase error:', error.message);
       return [];
     }
-    // Map from DB shape → app shape
     return (data || []).map((u) => ({
-      id: u.id,
+      id: Number(u.id),
       username: u.username,
+      password: u.password,
       name: u.name,
       email: u.email,
       role: u.role,
+      position: u.position,
       branchId: u.branch_id,
       employeeId: u.employee_id,
-      password: u.password_hash,
+      phone: u.phone,
+      status: u.status,
     }));
   } catch (err) {
     console.warn('[Supabase] fetchUsersFromSupabase exception:', err);
@@ -95,17 +100,18 @@ export const syncEmployeeToSupabase = async (emp) => {
       .upsert(
         {
           id: emp.id,
-          employee_code: emp.employeeId || emp.employee_code,
-          first_name: emp.firstName || emp.first_name,
-          last_name: emp.lastName || emp.last_name,
+          user_id: emp.userId || null,
           name: emp.name,
           email: emp.email || null,
-          department: emp.department || null,
-          position: emp.position || null,
-          branch_id: emp.branchId || emp.branch_id || null,
-          status: emp.status || 'ACTIVE',
-          daily_rate: emp.dailyRate || emp.daily_rate || 0,
-          hire_date: emp.hireDate || emp.hire_date || null,
+          phone: emp.phone || null,
+          position: emp.position || 'Staff Member',
+          department: emp.department || 'Operations',
+          branch_id: emp.branchId || null,
+          daily_rate: Number(emp.dailyRate) || 750,
+          hourly_rate: Number(emp.hourlyRate) || 93.75,
+          status: emp.status || 'Active',
+          hire_date: emp.hireDate || new Date().toISOString().split('T')[0],
+          qr_token: emp.qrToken || null,
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'id' }
@@ -136,17 +142,18 @@ export const fetchEmployeesFromSupabase = async (branchId = null) => {
     }
     return (data || []).map((e) => ({
       id: e.id,
-      employeeId: e.employee_code,
-      firstName: e.first_name,
-      lastName: e.last_name,
-      name: e.name || `${e.first_name} ${e.last_name}`,
+      userId: e.user_id,
+      name: e.name,
       email: e.email,
+      phone: e.phone,
       department: e.department,
       position: e.position,
       branchId: e.branch_id,
+      dailyRate: Number(e.daily_rate) || 750,
+      hourlyRate: Number(e.hourly_rate) || 93.75,
       status: e.status,
-      dailyRate: e.daily_rate,
       hireDate: e.hire_date,
+      qrToken: e.qr_token,
     }));
   } catch (err) {
     console.warn('[Supabase] fetchEmployeesFromSupabase exception:', err);
@@ -164,12 +171,21 @@ export const logAttendanceToSupabase = async (log) => {
         {
           id: log.id,
           employee_id: log.employeeId,
-          branch_id: log.branchId,
-          log_type: log.type || log.log_type,
-          log_date: log.date || log.log_date,
-          log_time: log.time || log.log_time,
-          notes: log.notes || null,
-          created_at: log.createdAt || new Date().toISOString(),
+          employee_name: log.employeeName || null,
+          branch_id: log.branchId || null,
+          date: log.date,
+          time_in: log.timeIn || null,
+          time_out: log.timeOut || null,
+          break_minutes: Number(log.breakMinutes) || 60,
+          regular_hours: Number(log.regularHours) || 0,
+          overtime_hours: Number(log.overtimeHours) || 0,
+          late_minutes: Number(log.lateMinutes) || 0,
+          undertime_minutes: Number(log.undertimeMinutes) || 0,
+          status: log.status || 'Present',
+          method: log.method || 'QR',
+          remarks: log.remarks || null,
+          is_manual: Boolean(log.isManual),
+          updated_at: new Date().toISOString(),
         },
         { onConflict: 'id' }
       )
