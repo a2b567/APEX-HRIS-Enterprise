@@ -1,0 +1,9 @@
+{
+  "name": "redmart-backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "chmod +x ./server || true",
+    "start": "./server"
+  }
+}
