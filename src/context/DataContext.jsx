@@ -245,6 +245,20 @@ export const DataProvider = ({ children }) => {
     );
   };
 
+  const deleteSupervisor = (id) => {
+    const sup = users.find((u) => u.id === Number(id) && u.role === 'SUPERVISOR');
+    if (!sup) return { success: false, message: 'Supervisor not found.' };
+
+    setUsers((prev) => prev.filter((u) => u.id !== Number(id)));
+
+    // Unassign from any branch
+    setBranches((prev) =>
+      prev.map((b) => (b.supervisorId === Number(id) ? { ...b, supervisorId: null } : b))
+    );
+
+    return { success: true };
+  };
+
   const addBranch = (branchData) => {
     const existingCodes = branches.map((b) => {
       const num = parseInt(b.id.replace('BRANCH-', ''), 10);
@@ -1098,6 +1112,7 @@ export const DataProvider = ({ children }) => {
         deleteBranch,
         addSupervisor,
         updateSupervisor,
+        deleteSupervisor,
         toggleSupervisorStatus,
         addEmployee,
         updateEmployee,

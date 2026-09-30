@@ -131,24 +131,7 @@ export const PayrollModule = () => {
     };
   }, [payrollRecords]);
 
-  // Per Branch Summaries (For Super Admin)
-  const branchPayrollBreakdowns = useMemo(() => {
-    if (!isSuperAdmin) return [];
-    return branches.map((b) => {
-      const bEmployees = employees.filter((e) => e.branchId === b.id);
-      const bRecords = bEmployees.map((e) =>
-        computeEmployeePayroll(e, attendanceLogs, cutoffType, selectedMonth, settings)
-      );
-      const bGross = bRecords.reduce((sum, r) => sum + r.grossPay, 0);
-      const bNet = bRecords.reduce((sum, r) => sum + r.netPay, 0);
-      return {
-        ...b,
-        employeeCount: bEmployees.length,
-        gross: bGross,
-        net: bNet,
-      };
-    });
-  }, [isSuperAdmin, branches, employees, attendanceLogs, cutoffType, selectedMonth, settings]);
+
 
   const handleExportPayrollCSV = () => {
     const headers = [
@@ -314,42 +297,7 @@ export const PayrollModule = () => {
         </div>
       </div>
 
-      {/* Super Admin: Branch Payroll Breakdown Cards */}
-      {isSuperAdmin && branchFilter === 'ALL' && (
-        <div className="no-print space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-              <Building2 className="w-4 h-4 text-blue-600" />
-              <span>Branch Payroll Summary Breakdown</span>
-            </h3>
-          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {branchPayrollBreakdowns.map((b) => (
-              <div
-                key={b.id}
-                onClick={() => setBranchFilter(b.id)}
-                className="p-4 rounded-2xl bg-white border border-slate-200/80 hover:border-blue-500 shadow-sm cursor-pointer transition flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
-                      {b.code}
-                    </span>
-                    <span className="text-[11px] text-slate-500 font-medium">{b.employeeCount} staff</span>
-                  </div>
-                  <h4 className="text-xs font-bold text-slate-900 mt-2 truncate">{b.name}</h4>
-                </div>
-
-                <div className="mt-3 pt-2.5 border-t border-slate-100">
-                  <p className="text-[10px] text-slate-500 uppercase font-semibold">Net Disbursement</p>
-                  <p className="font-mono text-sm font-bold text-emerald-600 mt-0.5">{formatCurrency(b.net)}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Executive Grand Total Summary Banner */}
       <div className="no-print rounded-2xl bg-white border border-slate-200/80 p-5 shadow-sm">

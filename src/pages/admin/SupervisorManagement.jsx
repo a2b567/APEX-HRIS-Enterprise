@@ -8,6 +8,7 @@ import {
   UserPlus,
   Edit2,
   Power,
+  Trash2,
   Mail,
   Phone,
   AlertTriangle,
@@ -16,11 +17,12 @@ import {
 } from 'lucide-react';
 
 export const SupervisorManagement = () => {
-  const { branches, users, addSupervisor, updateSupervisor, toggleSupervisorStatus } = useData();
+  const { branches, users, addSupervisor, updateSupervisor, deleteSupervisor, toggleSupervisorStatus } = useData();
   const { addToast } = useToast();
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingSupervisor, setEditingSupervisor] = useState(null);
+  const [deleteConfirmSupervisor, setDeleteConfirmSupervisor] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     username: '',
@@ -107,6 +109,25 @@ export const SupervisorManagement = () => {
       message: `${sup.name} is now ${sup.status === 'Active' ? 'Inactive' : 'Active'}.`,
       type: 'info',
     });
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deleteConfirmSupervisor) return;
+    const res = deleteSupervisor(deleteConfirmSupervisor.id);
+    if (res.success) {
+      addToast({
+        title: 'Supervisor Deleted',
+        message: `Supervisor ${deleteConfirmSupervisor.name} has been removed.`,
+        type: 'success',
+      });
+      setDeleteConfirmSupervisor(null);
+    } else {
+      addToast({
+        title: 'Cannot Delete Supervisor',
+        message: res.message || 'Error deleting supervisor.',
+        type: 'error',
+      });
+    }
   };
 
   return (
@@ -210,8 +231,8 @@ export const SupervisorManagement = () => {
               <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
                 <button
                   onClick={() => handleToggleStatus(sup)}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold border transition ${sup.status === 'Active'
-                      ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200'
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-bold border transition ${sup.status === 'Active'
+                      ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200'
                       : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
                     }`}
                 >
@@ -221,10 +242,20 @@ export const SupervisorManagement = () => {
 
                 <button
                   onClick={() => handleOpenEdit(sup)}
-                  className="flex items-center justify-center gap-1.5 py-2 px-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition"
+                  className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition"
+                  title="Edit supervisor profile"
                 >
                   <Edit2 className="w-3.5 h-3.5 text-blue-600" />
                   <span>Edit</span>
+                </button>
+
+                <button
+                  onClick={() => setDeleteConfirmSupervisor(sup)}
+                  className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition"
+                  title="Delete supervisor"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Delete</span>
                 </button>
               </div>
             </div>
@@ -363,6 +394,51 @@ export const SupervisorManagement = () => {
               </button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmSupervisor && (
+        <Modal
+          isOpen={!!deleteConfirmSupervisor}
+          onClose={() => setDeleteConfirmSupervisor(null)}
+          title="Delete Supervisor"
+          subtitle="This action cannot be undone."
+          maxWidth="max-w-md"
+        >
+          <div className="space-y-4">
+            <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+              <div className="text-xs text-rose-800">
+                <p className="font-bold mb-1">You are about to permanently delete:</p>
+                <p className="font-semibold text-sm text-rose-900">{deleteConfirmSupervisor.name}</p>
+                <p className="font-mono text-[11px] text-rose-700">@{deleteConfirmSupervisor.username}</p>
+                {deleteConfirmSupervisor.branchId && (
+                  <p className="mt-1.5 text-rose-700">
+                    ⚠️ Their branch assignment ({deleteConfirmSupervisor.branchId}) will be unlinked.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmSupervisor(null)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-sm transition"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Yes, Delete Supervisor</span>
+              </button>
+            </div>
+          </div>
         </Modal>
       )}
     </div>
