@@ -8,7 +8,6 @@ import {
   Building2,
   UserCheck,
   LogOut,
-  RefreshCw,
   ChevronDown,
   Bell,
   CheckCircle2,
@@ -20,25 +19,17 @@ import TermsModal from '../shared/TermsModal';
 
 export const Navbar = ({ sidebarOpen, setSidebarOpen }) => {
   const { user, role, logout } = useAuth();
-  const { branches, resetToFactoryDefaults } = useData();
+  const { branches } = useData();
   const { formattedTime, formattedDate, greeting } = useClock();
   const { addToast } = useToast();
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [isTermsOpen, setIsTermsOpen] = useState(false);
+  const [avatarError, setAvatarError] = useState(false);
 
   const roleInfo = getRoleBadge(role);
   const userBranch = branches.find((b) => b.id === user?.branchId);
 
-  const handleResetData = () => {
-    resetToFactoryDefaults();
-    addToast({
-      title: 'Database Reset',
-      message: 'Demo records restored to default seed data.',
-      type: 'info',
-    });
-    setUserMenuOpen(false);
-  };
 
 
   return (
@@ -87,11 +78,16 @@ export const Navbar = ({ sidebarOpen, setSidebarOpen }) => {
             onClick={() => setUserMenuOpen(!userMenuOpen)}
             className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-1.5 hover:bg-slate-100 transition shadow-sm"
           >
-            <div className="h-8 w-8 rounded-xl overflow-hidden bg-blue-600 flex items-center justify-center font-bold text-xs text-white">
-              {user?.avatar ? (
-                <img src={user.avatar} alt={user.name} className="h-full w-full object-cover" />
+            <div className="h-8 w-8 rounded-xl overflow-hidden bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center font-extrabold text-xs text-white shadow-inner shrink-0">
+              {user?.avatar && !avatarError ? (
+                <img
+                  src={user.avatar}
+                  alt={user.name}
+                  className="h-full w-full object-cover"
+                  onError={() => setAvatarError(true)}
+                />
               ) : (
-                user?.name?.slice(0, 2).toUpperCase() || 'US'
+                <span>{user?.name ? user.name.trim().split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'US'}</span>
               )}
             </div>
             <div className="hidden md:block text-left text-xs leading-tight pr-1">
@@ -120,13 +116,7 @@ export const Navbar = ({ sidebarOpen, setSidebarOpen }) => {
                   <ShieldCheck className="h-3.5 w-3.5 text-blue-600" />
                   <span>Terms & Privacy Act</span>
                 </button>
-                <button
-                  onClick={handleResetData}
-                  className="w-full flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50 transition"
-                >
-                  <RefreshCw className="h-3.5 w-3.5 text-amber-600" />
-                  <span>Reset Seed Data</span>
-                </button>
+
                 <button
                   onClick={() => {
                     setUserMenuOpen(false);

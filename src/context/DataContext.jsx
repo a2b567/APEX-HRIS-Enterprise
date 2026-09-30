@@ -35,9 +35,7 @@ export const DataProvider = ({ children }) => {
   const [branches, setBranches] = useState(() => {
     const saved = secureStorage.getItem(`${STORAGE_KEY_DATA}_branches`) || secureStorage.getItem('dtr_payroll_database_v5_testemp_branches');
     if (saved && Array.isArray(saved) && saved.length > 0) {
-      const existingIds = new Set(saved.map((b) => b.id));
-      const missing = INITIAL_BRANCHES.filter((b) => !existingIds.has(b.id));
-      return [...saved, ...missing];
+      return saved;
     }
     return INITIAL_BRANCHES;
   });
@@ -45,9 +43,14 @@ export const DataProvider = ({ children }) => {
   const [users, setUsers] = useState(() => {
     const saved = secureStorage.getItem(`${STORAGE_KEY_DATA}_users`) || secureStorage.getItem('dtr_payroll_database_v5_testemp_users');
     if (saved && Array.isArray(saved) && saved.length > 0) {
-      const existingIds = new Set(saved.map((u) => u.id));
-      const missing = INITIAL_USERS.filter((u) => !existingIds.has(u.id));
-      return [...saved, ...missing];
+      // Only guarantee the Super Admin account is always present (id: 1)
+      // All other accounts (supervisors, employees) respect deletion
+      const superAdmin = INITIAL_USERS.find((u) => u.id === 1);
+      const hasAdmin = saved.some((u) => u.id === 1);
+      if (superAdmin && !hasAdmin) {
+        return [superAdmin, ...saved];
+      }
+      return saved;
     }
     return INITIAL_USERS;
   });
@@ -185,7 +188,7 @@ export const DataProvider = ({ children }) => {
       role: 'SUPERVISOR',
       password: supervisorData.password || 'hashed_Sup@123',
       status: supervisorData.status || 'Active',
-      avatar: supervisorData.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${supervisorData.username}`,
+      avatar: supervisorData.avatar || '',
     };
 
     setUsers((prev) => [...prev, newSupervisor]);
@@ -354,7 +357,7 @@ export const DataProvider = ({ children }) => {
           position: empData.position || 'Staff',
           employeeId: newEmpId,
           branchId: empData.branchId || 'BRANCH-001',
-          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${generatedUsername}`,
+          avatar: '',
           status: empData.status || 'Active',
           phone: empData.phone || '',
         };
@@ -440,7 +443,7 @@ export const DataProvider = ({ children }) => {
       position: employee.position,
       employeeId: employee.id,
       branchId: employee.branchId,
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${finalUsername}`,
+      avatar: '',
       status: employee.status || 'Active',
       phone: employee.phone || '',
     };
@@ -577,7 +580,7 @@ export const DataProvider = ({ children }) => {
       position: assignedEmp.position,
       employeeId: assignedEmp.id,
       branchId: targetBranchId,
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${cleanUsername}`,
+      avatar: '',
       status: 'Active',
       phone: assignedEmp.phone || '',
     };

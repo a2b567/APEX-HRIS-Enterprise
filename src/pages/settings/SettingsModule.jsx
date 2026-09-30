@@ -7,7 +7,6 @@ import {
   Clock,
   Banknote,
   Save,
-  RefreshCw,
   QrCode,
   ShieldCheck,
   Lock,
@@ -21,7 +20,7 @@ import {
 } from 'lucide-react';
 
 export const SettingsModule = () => {
-  const { settings, updateSettings, resetToFactoryDefaults, users, updateUserAccount } = useData();
+  const { settings, updateSettings, users, updateUserAccount } = useData();
   const { user, loginUserDirectly, role } = useAuth();
   const { addToast } = useToast();
 
@@ -228,25 +227,6 @@ export const SettingsModule = () => {
     });
   };
 
-  const handleReset = () => {
-    if (window.confirm('Reset all branch records and attendance data back to default factory seed?')) {
-      resetToFactoryDefaults();
-      setFormData({
-        companyName: 'APEX HRIS Enterprise',
-        companyTagline: 'Enterprise Multi-Branch HRIS & Payroll Platform',
-        taxIdNumber: '123-456-789-000',
-        ...settings,
-        defaultShift: defaultShiftFallback,
-        qrSettings: qrSettingsFallback,
-        payrollRules: payrollRulesFallback,
-      });
-      addToast({
-        title: 'Factory Reset',
-        message: 'System restored to pristine seed data.',
-        type: 'info',
-      });
-    }
-  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300 max-w-4xl">
@@ -273,15 +253,6 @@ export const SettingsModule = () => {
           </p>
         </div>
 
-        {isAdmin && (
-          <button
-            onClick={handleReset}
-            className="flex items-center gap-1.5 rounded-xl bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-600 border border-slate-200 px-4 py-2 text-xs font-semibold shadow-sm transition self-start sm:self-auto"
-          >
-            <RefreshCw className="w-4 h-4 text-amber-500" />
-            <span>Reset to Factory Defaults</span>
-          </button>
-        )}
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">

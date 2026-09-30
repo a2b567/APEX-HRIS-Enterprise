@@ -32,7 +32,7 @@ export const AuthProvider = ({ children }) => {
     }
   }, [user]);
 
-  const login = async (username, password) => {
+  const login = async (username, password, expectedRole = null) => {
     setLoading(true);
 
     // ── Rate limit check (P0 Security) ──
@@ -48,11 +48,27 @@ export const AuthProvider = ({ children }) => {
       const backendRes = await api.auth.login(username.trim(), password);
       if (backendRes.success && backendRes.data) {
         const apiData = backendRes.data;
+        const loggedUserRole = apiData.user?.role?.name || apiData.role || 'SUPER_ADMIN';
+
+        if (expectedRole) {
+          const isRoleValid =
+            (expectedRole === 'ADMIN' && (loggedUserRole === 'SUPER_ADMIN' || loggedUserRole === 'ADMIN')) ||
+            (expectedRole === 'SUPERVISOR' && loggedUserRole === 'SUPERVISOR') ||
+            (expectedRole === 'EMPLOYEE' && loggedUserRole === 'EMPLOYEE');
+          if (!isRoleValid) {
+            setLoading(false);
+            return {
+              success: false,
+              message: `Maling account role ang napili. Ang account na ito ay hindi pang-${expectedRole.toLowerCase()}.`,
+            };
+          }
+        }
+
         const loggedUser = {
           id: apiData.user?.id || apiData.id || `USR-${Date.now()}`,
           username: apiData.user?.username || username,
           name: apiData.user?.name || apiData.user?.username || username,
-          role: apiData.user?.role?.name || apiData.role || 'SUPER_ADMIN',
+          role: loggedUserRole,
           branchId: apiData.user?.employee?.branch_id || 'BRANCH-001',
           branchName: apiData.user?.employee?.branch?.branch_name || 'Main Branch',
           employeeId: apiData.user?.employee?.employee_code || apiData.employee_id || null,
@@ -75,10 +91,10 @@ export const AuthProvider = ({ children }) => {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Merge initial users to guarantee new seeded supervisor accounts are present
-          const existingIds = new Set(parsed.map((u) => u.id));
-          const missingInitial = INITIAL_USERS.filter((u) => !existingIds.has(u.id));
-          allUsers = [...parsed, ...missingInitial];
+          // Only guarantee the Super Admin (id: 1) is always present; respect deletions for others
+          const superAdmin = INITIAL_USERS.find((u) => u.id === 1);
+          const hasAdmin = parsed.some((u) => u.id === 1);
+          allUsers = superAdmin && !hasAdmin ? [superAdmin, ...parsed] : parsed;
         }
       }
     } catch (e) {
@@ -100,6 +116,31 @@ export const AuthProvider = ({ children }) => {
       rateLimiter.recordLoginFailure(username);
       await auditLogger.log('LOGIN_FAILED', { username, reason: 'No account found' });
       return { success: false, message: 'No account found. Check your name or username.' };
+    }
+
+    // Role mismatch verification
+    if (expectedRole) {
+      const isRoleValid =
+        (expectedRole === 'ADMIN' && (matched.role === 'SUPER_ADMIN' || matched.role === 'ADMIN')) ||
+        (expectedRole === 'SUPERVISOR' && matched.role === 'SUPERVISOR') ||
+        (expectedRole === 'EMPLOYEE' && matched.role === 'EMPLOYEE');
+
+      if (!isRoleValid) {
+        setLoading(false);
+        const roleLabelMap = {
+          SUPER_ADMIN: 'Admin',
+          ADMIN: 'Admin',
+          SUPERVISOR: 'Supervisor',
+          EMPLOYEE: 'Employee',
+        };
+        const actualRoleName = roleLabelMap[matched.role] || matched.role;
+        const selectedRoleName = roleLabelMap[expectedRole] || expectedRole;
+        await auditLogger.log('LOGIN_FAILED', { username, reason: `Role mismatch: selected ${selectedRoleName}, actual ${actualRoleName}` });
+        return {
+          success: false,
+          message: `Hindi pwedeng mag-login. Naka-select ang "${selectedRoleName}" role pero ang account na ito ay pang-${actualRoleName}. Piliin ang tamang role sa itaas.`,
+        };
+      }
     }
 
     const cleanPass = password.trim();

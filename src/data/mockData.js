@@ -86,7 +86,7 @@ export const INITIAL_USERS = [
     position: 'Branch Operations Supervisor',
     branchId: 'BRANCH-001',
     phone: '+63 917 111 2233',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=maria.santos',
+    avatar: '',
     status: 'Active',
   },
   {
@@ -99,7 +99,7 @@ export const INITIAL_USERS = [
     position: 'Branch Operations Supervisor',
     branchId: 'BRANCH-002',
     phone: '+63 917 222 3344',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=carlo.reyes',
+    avatar: '',
     status: 'Active',
   },
   {
@@ -112,7 +112,7 @@ export const INITIAL_USERS = [
     position: 'Branch Operations Supervisor',
     branchId: 'BRANCH-003',
     phone: '+63 917 333 4455',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=elena.villanueva',
+    avatar: '',
     status: 'Active',
   },
   {
@@ -125,7 +125,7 @@ export const INITIAL_USERS = [
     position: 'Branch Operations Supervisor',
     branchId: 'BRANCH-004',
     phone: '+63 917 444 5566',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=mark.torres',
+    avatar: '',
     status: 'Active',
   },
   {
@@ -138,7 +138,7 @@ export const INITIAL_USERS = [
     position: 'Branch Operations Supervisor',
     branchId: 'BRANCH-005',
     phone: '+63 917 555 6677',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=patricia.lim',
+    avatar: '',
     status: 'Active',
   },
   {
@@ -151,7 +151,7 @@ export const INITIAL_USERS = [
     position: 'Software Engineer',
     employeeId: 'EMP-001-01',
     branchId: 'BRANCH-001',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=juan.cruz',
+    avatar: '',
     status: 'Active',
     phone: '+63 917 123 4567',
   },

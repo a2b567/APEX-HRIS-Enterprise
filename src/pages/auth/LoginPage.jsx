@@ -97,7 +97,7 @@ export const LoginPage = () => {
     setErrorMessage('');
     setSubmitting(true);
     try {
-      const result = await login(email, password);
+      const result = await login(email, password, selectedRole);
       if (result.success) {
         const role = result.user?.role;
         if (role === 'SUPER_ADMIN') navigate('/dashboard');
