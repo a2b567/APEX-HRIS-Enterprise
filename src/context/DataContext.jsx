@@ -13,13 +13,16 @@ import { secureStorage } from '../utils/securityUtils';
 
 export const DataContext = createContext(null);
 
-// v6_5sup: 5 branches + 5 supervisors seeded
-const STORAGE_KEY_DATA = 'dtr_payroll_database_v6_5sup';
+// v8_redmart: Guaranteed sync of Aron & Marco supervisors across all devices
+const STORAGE_KEY_DATA = 'dtr_payroll_database_v8_redmart';
 const OLD_KEY = 'dtr_payroll_database_v3_clean';
 
 // One-time purge of old cache keys on first load
 const purgeOldCache = () => {
   const oldKeys = [
+    'dtr_payroll_database_v6_5sup_branches', 'dtr_payroll_database_v6_5sup_users',
+    'dtr_payroll_database_v6_5sup_employees', 'dtr_payroll_database_v6_5sup_attendance',
+    'dtr_payroll_database_v5_testemp_users', 'dtr_payroll_database_v5_testemp_branches',
     `${OLD_KEY}_branches`, `${OLD_KEY}_employees`, `${OLD_KEY}_users`,
     `${OLD_KEY}_attendance`, `${OLD_KEY}_settings`, `${OLD_KEY}_scans`,
     `APEX_ENC_${OLD_KEY}_branches`, `APEX_ENC_${OLD_KEY}_employees`,
@@ -27,13 +30,16 @@ const purgeOldCache = () => {
     `APEX_ENC_${OLD_KEY}_settings`, `APEX_ENC_${OLD_KEY}_scans`,
     OLD_KEY,
   ];
-  oldKeys.forEach((k) => localStorage.removeItem(k));
+  oldKeys.forEach((k) => {
+    localStorage.removeItem(k);
+    localStorage.removeItem(`APEX_ENC_${k}`);
+  });
 };
 purgeOldCache();
 
 export const DataProvider = ({ children }) => {
   const [branches, setBranches] = useState(() => {
-    const saved = secureStorage.getItem(`${STORAGE_KEY_DATA}_branches`) || secureStorage.getItem('dtr_payroll_database_v5_testemp_branches');
+    const saved = secureStorage.getItem(`${STORAGE_KEY_DATA}_branches`);
     if (saved && Array.isArray(saved) && saved.length > 0) {
       return saved;
     }
@@ -41,22 +47,22 @@ export const DataProvider = ({ children }) => {
   });
 
   const [users, setUsers] = useState(() => {
-    const saved = secureStorage.getItem(`${STORAGE_KEY_DATA}_users`) || secureStorage.getItem('dtr_payroll_database_v5_testemp_users');
+    const saved = secureStorage.getItem(`${STORAGE_KEY_DATA}_users`);
     if (saved && Array.isArray(saved) && saved.length > 0) {
-      // Only guarantee the Super Admin account is always present (id: 1)
-      // All other accounts (supervisors, employees) respect deletion
-      const superAdmin = INITIAL_USERS.find((u) => u.id === 1);
-      const hasAdmin = saved.some((u) => u.id === 1);
-      if (superAdmin && !hasAdmin) {
-        return [superAdmin, ...saved];
-      }
-      return saved;
+      // Merge initial users so Aron, Marco, and Admin are always preserved
+      const merged = [...saved];
+      INITIAL_USERS.forEach((initU) => {
+        if (!merged.some((u) => u.id === initU.id || u.username.toLowerCase() === initU.username.toLowerCase())) {
+          merged.push(initU);
+        }
+      });
+      return merged;
     }
     return INITIAL_USERS;
   });
 
   const [employees, setEmployees] = useState(() => {
-    return secureStorage.getItem(`${STORAGE_KEY_DATA}_employees`) || secureStorage.getItem('dtr_payroll_database_v5_testemp_employees') || INITIAL_EMPLOYEES;
+    return secureStorage.getItem(`${STORAGE_KEY_DATA}_employees`) || INITIAL_EMPLOYEES;
   });
 
   const [attendanceLogs, setAttendanceLogs] = useState(() => {

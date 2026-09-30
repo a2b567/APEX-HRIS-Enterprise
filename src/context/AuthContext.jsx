@@ -7,10 +7,7 @@ import { secureStorage } from '../utils/securityUtils';
 
 const AuthContext = createContext(null);
 
-const STORAGE_KEY_AUTH = 'dtr_payroll_auth_user_v4_nodemo';
-
-// Clear old auth cache on load
-localStorage.removeItem('dtr_payroll_auth_user_v3_clean');
+const STORAGE_KEY_AUTH = 'dtr_payroll_auth_user_v8_redmart';
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
@@ -85,19 +82,21 @@ export const AuthProvider = ({ children }) => {
       console.warn('Backend login attempt failed, evaluating local mock auth:', err);
     }
 
-    // 2. Fallback check against stored users
-    let allUsers = INITIAL_USERS;
+    // 2. Fallback check against stored users + INITIAL_USERS guaranteed
+    let allUsers = [...INITIAL_USERS];
     try {
       const saved =
+        secureStorage.getItem('dtr_payroll_database_v8_redmart_users') ||
         secureStorage.getItem('dtr_payroll_database_v6_5sup_users') ||
-        secureStorage.getItem('dtr_payroll_database_v5_testemp_users') ||
-        localStorage.getItem('dtr_payroll_database_v6_5sup_users');
+        localStorage.getItem('dtr_payroll_database_v8_redmart_users');
       if (saved) {
         const parsed = Array.isArray(saved) ? saved : JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const superAdmin = INITIAL_USERS.find((u) => u.id === 1);
-          const hasAdmin = parsed.some((u) => u.id === 1);
-          allUsers = superAdmin && !hasAdmin ? [superAdmin, ...parsed] : parsed;
+          parsed.forEach((storedU) => {
+            if (!allUsers.some((u) => u.id === storedU.id || (u.username && u.username.toLowerCase() === storedU.username.toLowerCase()))) {
+              allUsers.push(storedU);
+            }
+          });
         }
       }
     } catch (e) {
