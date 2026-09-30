@@ -62,7 +62,24 @@ export const DataProvider = ({ children }) => {
   });
 
   const [employees, setEmployees] = useState(() => {
-    return secureStorage.getItem(`${STORAGE_KEY_DATA}_employees`) || INITIAL_EMPLOYEES;
+    const raw = secureStorage.getItem(`${STORAGE_KEY_DATA}_employees`) || INITIAL_EMPLOYEES;
+    if (!Array.isArray(raw)) return INITIAL_EMPLOYEES;
+    
+    // Auto-heal duplicate IDs so every single employee has a strictly unique ID & UID
+    const seenIds = new Set();
+    return raw.map((emp, index) => {
+      let uniqueId = emp.id;
+      if (!uniqueId || seenIds.has(uniqueId)) {
+        const branchNum = (emp.branchId || 'BRANCH-001').replace('BRANCH-', '');
+        uniqueId = `EMP-${branchNum}-${String(index + 1).padStart(2, '0')}`;
+      }
+      seenIds.add(uniqueId);
+      return {
+        ...emp,
+        id: uniqueId,
+        uid: emp.uid || `EMP_UID_${index}_${Math.random().toString(36).slice(2, 8)}`,
+      };
+    });
   });
 
   const [attendanceLogs, setAttendanceLogs] = useState(() => {
@@ -317,13 +334,32 @@ export const DataProvider = ({ children }) => {
   };
 
   /**
+   * Helper to calculate next guaranteed unique employee ID for a branch
+   */
+  const getNextEmployeeId = (branchId, currentList = employees) => {
+    const branchNumber = (branchId || 'BRANCH-001').replace('BRANCH-', '');
+    const pattern = new RegExp(`^EMP-${branchNumber}-(\\d+)$`);
+    let maxSeq = 0;
+    currentList.forEach((e) => {
+      if (e.branchId === branchId && e.id) {
+        const match = e.id.match(pattern);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxSeq) maxSeq = num;
+        }
+      }
+    });
+    return `EMP-${branchNumber}-${(maxSeq + 1).toString().padStart(2, '0')}`;
+  };
+
+  /**
    * EMPLOYEE MANAGEMENT (WITH AUTO QR TOKEN GENERATION & USER ACCOUNT CREATION)
    */
   const addEmployee = (empData, accountOptions = {}) => {
-    const branchEmployees = employees.filter((e) => e.branchId === empData.branchId);
-    const branchNumber = (empData.branchId || 'BRANCH-001').replace('BRANCH-', '');
-    const empSeq = (branchEmployees.length + 1).toString().padStart(2, '0');
-    const newEmpId = empData.id || `EMP-${branchNumber}-${empSeq}`;
+    const branchId = empData.branchId || 'BRANCH-001';
+    const newEmpId = empData.id && !employees.some((e) => e.id === empData.id)
+      ? empData.id
+      : getNextEmployeeId(branchId, employees);
 
     let linkedUserId = empData.userId || null;
     let createdUser = null;
@@ -332,13 +368,17 @@ export const DataProvider = ({ children }) => {
     const shouldCreateAccount = empData.createAccount !== false;
 
     if (shouldCreateAccount) {
-      const generatedUsername =
-        (empData.username || empData.name)
-          .toLowerCase()
-          .trim()
-          .replace(/[^a-z0-9]+/g, '.')
-          .replace(/^\.|\.$/g, '') ||
-        `emp.${newEmpId.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+      const cleanName = (empData.name || 'Staff')
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, '.')
+        .replace(/^\.|\.$/g, '');
+      let baseUsername = (empData.username || cleanName || `emp.${newEmpId.toLowerCase().replace(/[^a-z0-9]/g, '')}`);
+      let generatedUsername = baseUsername;
+      let counter = 1;
+      while (users.some((u) => u.username.toLowerCase() === generatedUsername.toLowerCase())) {
+        generatedUsername = `${baseUsername}.${counter++}`;
+      }
 
       const existingUser = users.find(
         (u) =>
@@ -362,7 +402,7 @@ export const DataProvider = ({ children }) => {
           email: empData.email || `${generatedUsername}@apexhris.enterprise`,
           position: empData.position || 'Staff',
           employeeId: newEmpId,
-          branchId: empData.branchId || 'BRANCH-001',
+          branchId: branchId,
           avatar: '',
           status: empData.status || 'Active',
           phone: empData.phone || '',
@@ -376,12 +416,13 @@ export const DataProvider = ({ children }) => {
     const newEmployee = {
       ...empData,
       id: newEmpId,
+      uid: `EMP_UID_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       userId: linkedUserId,
       dailyRate: Number(empData.dailyRate) || 750,
       hourlyRate: Number(empData.hourlyRate) || (Number(empData.dailyRate || 750) / 8),
       status: empData.status || 'Active',
       hireDate: empData.hireDate || new Date().toISOString().split('T')[0],
-      qrToken: createEmployeeQRToken(newEmpId, empData.branchId || 'BRANCH-001'),
+      qrToken: createEmployeeQRToken(newEmpId, branchId),
       qrIssuedAt: new Date().toISOString().split('T')[0],
       qrStatus: 'active',
       idType: empData.idType || 'Government ID / PhilID',
@@ -396,10 +437,85 @@ export const DataProvider = ({ children }) => {
     return { success: true, employee: newEmployee, user: createdUser };
   };
 
+  /**
+   * BULK IMPORT EMPLOYEES (Ensures unique sequential IDs and unique user accounts)
+   */
+  const addEmployeesBulk = (empList) => {
+    let currentEmployees = [...employees];
+    let currentUsers = [...users];
+    const addedEmployees = [];
+    const addedUsers = [];
+
+    empList.forEach((empData, index) => {
+      const branchId = empData.branchId || 'BRANCH-001';
+      const newEmpId = getNextEmployeeId(branchId, currentEmployees);
+
+      // Clean unique username
+      const cleanName = (empData.name || 'Staff')
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, '.')
+        .replace(/^\.|\.$/g, '');
+      let baseUsername = (empData.username || cleanName || `emp.${newEmpId.toLowerCase().replace(/[^a-z0-9]/g, '')}`);
+      let generatedUsername = baseUsername;
+      let counter = 1;
+      while (currentUsers.some((u) => u.username.toLowerCase() === generatedUsername.toLowerCase())) {
+        generatedUsername = `${baseUsername}.${counter++}`;
+      }
+
+      const nextUserId = Math.max(...currentUsers.map((u) => u.id), 0) + 1;
+      const pass = empData.accountPassword || empData.password || 'Emp@123';
+
+      const newUser = {
+        id: nextUserId,
+        role: 'EMPLOYEE',
+        username: generatedUsername,
+        password: pass.startsWith('hashed_') ? pass : `hashed_${pass}`,
+        name: empData.name,
+        email: empData.email || `${generatedUsername}@apexhris.enterprise`,
+        position: empData.position || 'Staff',
+        employeeId: newEmpId,
+        branchId: branchId,
+        avatar: '',
+        status: empData.status || 'Active',
+        phone: empData.phone || '',
+      };
+
+      const newEmployee = {
+        ...empData,
+        id: newEmpId,
+        uid: `EMP_UID_${Date.now()}_${index}_${Math.random().toString(36).slice(2, 8)}`,
+        userId: nextUserId,
+        dailyRate: Number(empData.dailyRate) || 750,
+        hourlyRate: Number(empData.hourlyRate) || (Number(empData.dailyRate || 750) / 8),
+        status: empData.status || 'Active',
+        hireDate: empData.hireDate || new Date().toISOString().split('T')[0],
+        qrToken: createEmployeeQRToken(newEmpId, branchId),
+        qrIssuedAt: new Date().toISOString().split('T')[0],
+        qrStatus: 'active',
+        idType: empData.idType || 'Government ID / PhilID',
+        idDocumentUrl: empData.idDocumentUrl || null,
+        idDocumentName: empData.idDocumentName || '',
+        idVerificationStatus: empData.idVerificationStatus || (empData.idDocumentUrl || empData.idDocumentName ? 'Verified' : 'Pending Verification'),
+        idVerifiedAt: empData.idVerifiedAt || (empData.idDocumentUrl || empData.idDocumentName ? new Date().toISOString().split('T')[0] : null),
+        idVerifiedBy: empData.idVerifiedBy || 'System Administrator',
+      };
+
+      currentEmployees.push(newEmployee);
+      currentUsers.push(newUser);
+      addedEmployees.push(newEmployee);
+      addedUsers.push(newUser);
+    });
+
+    setEmployees(currentEmployees);
+    setUsers(currentUsers);
+    return { success: true, employees: addedEmployees, users: addedUsers };
+  };
+
   const updateEmployee = (employeeId, updates) => {
     setEmployees((prev) =>
       prev.map((e) =>
-        e.id === employeeId
+        e.id === employeeId || (e.uid && updates.uid && e.uid === updates.uid)
           ? {
               ...e,
               ...updates,
@@ -412,9 +528,44 @@ export const DataProvider = ({ children }) => {
     return { success: true };
   };
 
-  const deleteEmployee = (employeeId) => {
-    setEmployees((prev) => prev.filter((e) => e.id !== employeeId));
-    setAttendanceLogs((prev) => prev.filter((l) => l.employeeId !== employeeId));
+  /**
+   * DELETE EMPLOYEE — Strictly deletes only ONE single target record
+   */
+  const deleteEmployee = (target) => {
+    let deletedId = null;
+
+    setEmployees((prev) => {
+      let indexToRemove = -1;
+
+      // 1. If target is an object with uid, find by uid
+      if (typeof target === 'object' && target !== null) {
+        if (target.uid) {
+          indexToRemove = prev.findIndex((e) => e.uid === target.uid);
+        }
+        // 2. If no uid, find by id and matching name
+        if (indexToRemove === -1 && target.id && target.name) {
+          indexToRemove = prev.findIndex((e) => e.id === target.id && e.name === target.name);
+        }
+        // 3. Fallback to first matching id
+        if (indexToRemove === -1 && target.id) {
+          indexToRemove = prev.findIndex((e) => e.id === target.id);
+        }
+      } else {
+        // String ID or UID passed
+        indexToRemove = prev.findIndex((e) => e.uid === target || e.id === target);
+      }
+
+      if (indexToRemove === -1) return prev;
+
+      deletedId = prev[indexToRemove].id;
+      const clone = [...prev];
+      clone.splice(indexToRemove, 1); // Strictly remove exactly 1 single employee item!
+      return clone;
+    });
+
+    if (deletedId) {
+      setAttendanceLogs((prev) => prev.filter((l) => l.employeeId !== deletedId));
+    }
     return { success: true };
   };
 
@@ -1124,6 +1275,7 @@ export const DataProvider = ({ children }) => {
         deleteSupervisor,
         toggleSupervisorStatus,
         addEmployee,
+        addEmployeesBulk,
         updateEmployee,
         deleteEmployee,
         createEmployeeUser,

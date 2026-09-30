@@ -46,6 +46,7 @@ export const EmployeeManagement = () => {
     users,
     employees,
     addEmployee,
+    addEmployeesBulk,
     updateEmployee,
     deleteEmployee,
     regenerateEmployeeQR,
@@ -151,19 +152,16 @@ export const EmployeeManagement = () => {
 
   const handleBulkImport = () => {
     setImportingRows(true);
-    let successCount = 0;
-    importPreview.forEach((row) => {
-      if (row.name && row.position) {
-        addEmployee(row);
-        successCount++;
-      }
-    });
+    const validRows = importPreview.filter((row) => row.name && row.position);
+    if (validRows.length > 0) {
+      addEmployeesBulk(validRows);
+    }
     setImportingRows(false);
     setImportModalOpen(false);
     setImportPreview([]);
     addToast({
       title: 'Bulk Import Complete',
-      message: `Successfully registered ${successCount} employee${successCount !== 1 ? 's' : ''}.`,
+      message: `Successfully registered ${validRows.length} employee${validRows.length !== 1 ? 's' : ''} with unique sequential IDs.`,
       type: 'success',
     });
   };
@@ -355,10 +353,10 @@ export const EmployeeManagement = () => {
 
   const handleDelete = () => {
     if (!employeeToDelete) return;
-    deleteEmployee(employeeToDelete.id);
+    deleteEmployee(employeeToDelete);
     addToast({
       title: 'Employee Removed',
-      message: `${employeeToDelete.name} was removed from the roster.`,
+      message: `${employeeToDelete.name} (${employeeToDelete.id}) was removed from the roster.`,
       type: 'info',
     });
     setDeleteConfirmOpen(false);
