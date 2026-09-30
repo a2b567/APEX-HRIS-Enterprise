@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '../../components/shared/Toast';
 import TermsModal from '../../components/shared/TermsModal';
+import { validateIdDocument } from '../../utils/idValidator';
 
 export const LoginPage = () => {
   // Mode: 'SIGN_IN' | 'REGISTER'
@@ -54,6 +55,8 @@ export const LoginPage = () => {
   });
 
   const [idPreview, setIdPreview] = useState(null);
+  const [idValidating, setIdValidating] = useState(false);
+  const [idValidationError, setIdValidationError] = useState('');
 
   const { login, loginUserDirectly, loading } = useAuth();
   const { registerEmployeeAccount, branches } = useData();
@@ -113,24 +116,53 @@ export const LoginPage = () => {
     }
   };
 
-  const handleIdFileUpload = (e) => {
+  const handleIdFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result;
-      setIdPreview(result);
-      setRegForm((prev) => ({
-        ...prev,
-        idDocumentUrl: result,
-        idDocumentName: file.name,
-      }));
-    };
-    reader.readAsDataURL(file);
+    setIdValidationError('');
+    setIdValidating(true);
+
+    try {
+      const validation = await validateIdDocument(file, regForm.idType);
+      if (!validation.isValid) {
+        setIdValidationError(validation.error);
+        setIdPreview(null);
+        setRegForm((prev) => ({
+          ...prev,
+          idDocumentUrl: null,
+          idDocumentName: '',
+        }));
+        addToast({
+          title: 'Invalid ID Document',
+          message: validation.error,
+          type: 'error',
+        });
+      } else {
+        setIdPreview(validation.dataUrl || URL.createObjectURL(file));
+        setIdValidationError('');
+        setRegForm((prev) => ({
+          ...prev,
+          idDocumentUrl: validation.dataUrl || URL.createObjectURL(file),
+          idDocumentName: file.name,
+        }));
+        addToast({
+          title: 'ID Validated',
+          message: `${regForm.idType} document format verified successfully.`,
+          type: 'success',
+        });
+      }
+    } catch (err) {
+      setIdValidationError('Failed to validate ID document. Please try another clear photo.');
+    } finally {
+      setIdValidating(false);
+      // Reset input value so user can re-upload if needed
+      e.target.value = '';
+    }
   };
 
   const handleUseSampleId = () => {
+    setIdValidationError('');
     // Generate a clean SVG sample ID badge
     const sampleCanvas = document.createElement('canvas');
     sampleCanvas.width = 400;
@@ -162,11 +194,17 @@ export const LoginPage = () => {
         idDocumentUrl: dataUrl,
         idDocumentName: `${(prev.name || 'employee').toLowerCase().replace(/\s+/g, '_')}_verified_id.png`,
       }));
+      addToast({
+        title: 'Sample ID Attached',
+        message: 'Pre-verified sample ID badge attached.',
+        type: 'info',
+      });
     }
   };
 
   const handleRemoveId = () => {
     setIdPreview(null);
+    setIdValidationError('');
     setRegForm((prev) => ({
       ...prev,
       idDocumentUrl: null,
@@ -184,7 +222,12 @@ export const LoginPage = () => {
     }
 
     if (!regForm.idDocumentUrl) {
-      setErrorMessage('Please upload and confirm your ID to verify your identity before creating your account.');
+      setErrorMessage('Please upload a valid, readable ID document to verify your identity before creating your account.');
+      return;
+    }
+
+    if (idValidationError) {
+      setErrorMessage(idValidationError);
       return;
     }
 
@@ -680,8 +723,27 @@ export const LoginPage = () => {
                       </select>
                     </div>
 
+                    {/* Validation Error Alert */}
+                    {idValidationError && (
+                      <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-medium flex items-start gap-2.5 animate-in fade-in">
+                        <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-bold text-rose-800">Invalid ID Document</p>
+                          <p className="text-[11px] text-rose-600 mt-0.5">{idValidationError}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Validating Spinner */}
+                    {idValidating && (
+                      <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-center gap-3 text-xs text-blue-700 font-semibold animate-pulse">
+                        <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                        <span>Analyzing & validating {regForm.idType} document format...</span>
+                      </div>
+                    )}
+
                     {/* Upload Box or Live Preview */}
-                    {idPreview ? (
+                    {!idValidating && idPreview ? (
                       <div className="p-3 bg-white border border-emerald-200 rounded-xl flex items-center justify-between gap-3 shadow-sm">
                         <div className="flex items-center gap-3 overflow-hidden">
                           <img
@@ -695,7 +757,7 @@ export const LoginPage = () => {
                             </p>
                             <div className="flex items-center gap-1.5 text-[10px] text-emerald-600 font-semibold mt-0.5">
                               <CheckCircle2 className="w-3 h-3" />
-                              <span>{regForm.idType} Attached & Confirmed</span>
+                              <span>{regForm.idType} Verified & Accepted</span>
                             </div>
                           </div>
                         </div>
@@ -708,7 +770,7 @@ export const LoginPage = () => {
                           Change
                         </button>
                       </div>
-                    ) : (
+                    ) : !idValidating ? (
                       <div className="space-y-2">
                         <label className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-300 hover:border-blue-500 bg-white rounded-2xl cursor-pointer transition group">
                           <ShieldCheck className="w-7 h-7 text-slate-400 group-hover:text-blue-600 transition mb-1" />
@@ -716,7 +778,7 @@ export const LoginPage = () => {
                             Click to upload ID photo or scan
                           </span>
                           <span className="text-[10px] text-slate-400 mt-0.5">
-                            PNG, JPG, or PDF (Max 5MB)
+                            JPG, PNG, or PDF (Must be a clear landscape ID card)
                           </span>
                           <input
                             type="file"
@@ -737,7 +799,7 @@ export const LoginPage = () => {
                           </button>
                         </div>
                       </div>
-                    )}
+                    ) : null}
                   </div>
 
                     {/* Terms & Conditions Agreement Checkbox */}
