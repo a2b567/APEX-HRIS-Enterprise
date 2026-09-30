@@ -4,6 +4,6 @@
   "private": true,
   "scripts": {
     "build": "chmod +x ./server || true",
-    "start": "./server"
+    "start": "node server.js"
   }
 }
