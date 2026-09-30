@@ -4,6 +4,7 @@ import { api } from '../services/api';
 import { rateLimiter } from '../security/rateLimiter';
 import auditLogger from '../security/auditLogger';
 import { secureStorage } from '../utils/securityUtils';
+import { fetchUsersFromSupabase, syncUserToSupabase, isSupabaseConfigured } from '../services/supabaseClient';
 
 const AuthContext = createContext(null);
 
@@ -82,8 +83,23 @@ export const AuthProvider = ({ children }) => {
       console.warn('Backend login attempt failed, evaluating local mock auth:', err);
     }
 
-    // 2. Fallback check against stored users + INITIAL_USERS guaranteed
+    // 2. Fetch from Supabase (cloud) + local fallback
     let allUsers = [...INITIAL_USERS];
+    try {
+      // Try Supabase first for cross-device sync
+      if (isSupabaseConfigured()) {
+        const cloudUsers = await fetchUsersFromSupabase();
+        if (cloudUsers && cloudUsers.length > 0) {
+          cloudUsers.forEach((cloudU) => {
+            if (!allUsers.some((u) => u.id === cloudU.id || (u.username && u.username.toLowerCase() === cloudU.username?.toLowerCase()))) {
+              allUsers.push(cloudU);
+            }
+          });
+        }
+      }
+    } catch (cloudErr) {
+      console.warn('[Supabase] Could not fetch cloud users, using local:', cloudErr);
+    }
     try {
       const saved =
         secureStorage.getItem('dtr_payroll_database_v8_redmart_users') ||
@@ -93,7 +109,7 @@ export const AuthProvider = ({ children }) => {
         const parsed = Array.isArray(saved) ? saved : JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           parsed.forEach((storedU) => {
-            if (!allUsers.some((u) => u.id === storedU.id || (u.username && u.username.toLowerCase() === storedU.username.toLowerCase()))) {
+            if (!allUsers.some((u) => u.id === storedU.id || (u.username && u.username.toLowerCase() === storedU.username?.toLowerCase()))) {
               allUsers.push(storedU);
             }
           });
@@ -171,6 +187,10 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
     rateLimiter.clearLoginFailures(username);
     await auditLogger.log('LOGIN_SUCCESS', { source: 'local', username }, { id: matched.id, name: matched.name, role: matched.role });
+    // Sync this user to Supabase in background for cross-device availability
+    if (isSupabaseConfigured()) {
+      syncUserToSupabase(matched).catch(() => {});
+    }
     return { success: true, user: matched };
   };
 

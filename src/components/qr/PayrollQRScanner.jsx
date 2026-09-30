@@ -1,12 +1,18 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { Html5Qrcode } from "html5-qrcode";
-import { Camera, CameraOff, KeyRound, CheckCircle2, X } from "lucide-react";
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
+import { Camera, CameraOff, KeyRound, CheckCircle2, X, Image as ImageIcon } from "lucide-react";
 
 const CONTAINER_ID = "payroll-qr-reader";
 
 export const PayrollQRScanner = ({ onScanSuccess, lastResult }) => {
+  const fileInputRef = useRef(null);
   const scannerRef = useRef(null);
-  const isScanningRef = useRef(false);   // guard flag — avoids double-start in Strict Mode
+  const isScanningRef = useRef(false);
+  const startingRef = useRef(false);
+  const cbRef = useRef(onScanSuccess);
+  const debounceRef = useRef(0);
+  cbRef.current = onScanSuccess;
+
   const [uiScanning, setUiScanning] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const [cameras, setCameras] = useState([]);
@@ -14,98 +20,163 @@ export const PayrollQRScanner = ({ onScanSuccess, lastResult }) => {
   const [manualId, setManualId] = useState("");
 
   useEffect(() => {
+    let alive = true;
     Html5Qrcode.getCameras()
       .then((devices) => {
-        if (devices && devices.length) {
-          setCameras(devices);
-          const back = devices.find(
-            (d) =>
-              d.label.toLowerCase().includes("back") ||
-              d.label.toLowerCase().includes("environment")
-          );
-          setSelectedCameraId(back ? back.id : devices[0].id);
-        }
+        if (!alive || !devices?.length) return;
+        setCameras(devices);
+        const back = devices.find(
+          (d) =>
+            d.label.toLowerCase().includes("back") ||
+            d.label.toLowerCase().includes("environment") ||
+            d.label.toLowerCase().includes("rear")
+        );
+        setSelectedCameraId(back ? back.id : devices[0].id);
       })
-      .catch(() => setCameraError("Could not access cameras. Use the manual fallback below."));
+      .catch(() => {
+        if (alive) setCameraError("Could not access cameras. Use manual entry or upload below.");
+      });
+    return () => { alive = false; };
   }, []);
 
-  const startScanning = useCallback(async (camId) => {
-    if (isScanningRef.current) return;           // already scanning — skip
-    setCameraError("");
+  const handleScanHit = useCallback((decodedText) => {
+    const now = Date.now();
+    if (now - debounceRef.current < 1500) return;
+    debounceRef.current = now;
+    if (cbRef.current) {
+      cbRef.current(decodedText);
+    }
+  }, []);
+
+  const stopScanning = useCallback(async () => {
+    if (!isScanningRef.current || !scannerRef.current) return;
     try {
-      if (!scannerRef.current) {
-        scannerRef.current = new Html5Qrcode(CONTAINER_ID);
-      }
-      const id = camId || selectedCameraId || { facingMode: "environment" };
-      await scannerRef.current.start(
-        id,
-        { fps: 10, qrbox: { width: 220, height: 220 }, aspectRatio: 1.0 },
-        (decodedText) => { if (onScanSuccess) onScanSuccess(decodedText); },
+      await scannerRef.current.stop();
+    } catch (e) {}
+    isScanningRef.current = false;
+    setUiScanning(false);
+  }, []);
+
+  const destroyScanner = useCallback(async () => {
+    await stopScanning();
+    if (scannerRef.current) {
+      try {
+        await scannerRef.current.clear();
+      } catch (e) {}
+      scannerRef.current = null;
+    }
+  }, [stopScanning]);
+
+  const startScanning = useCallback(async (camId) => {
+    if (isScanningRef.current || startingRef.current) return;
+    startingRef.current = true;
+    setCameraError("");
+
+    await destroyScanner();
+
+    try {
+      const qr = new Html5Qrcode(CONTAINER_ID, {
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.QR_CODE,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.EAN_13,
+        ],
+        verbose: false,
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true,
+        },
+      });
+      scannerRef.current = qr;
+
+      const cameraConfig = camId || selectedCameraId || { facingMode: "environment" };
+
+      await qr.start(
+        cameraConfig,
+        {
+          fps: 20,
+          aspectRatio: 1.0,
+          disableFlip: false,
+          videoConstraints: {
+            width: { min: 640, ideal: 1280, max: 1920 },
+            height: { min: 480, ideal: 720, max: 1080 },
+            focusMode: "continuous",
+          },
+        },
+        (decodedText) => {
+          handleScanHit(decodedText);
+        },
         () => {}
       );
       isScanningRef.current = true;
       setUiScanning(true);
     } catch (err) {
       console.error("PayrollQRScanner start error:", err);
-      setCameraError("Camera access denied or unavailable. Use manual input below.");
+      setCameraError("Camera access denied or unavailable. Use manual input or upload below.");
+      await destroyScanner();
       isScanningRef.current = false;
       setUiScanning(false);
+    } finally {
+      startingRef.current = false;
     }
-  }, [selectedCameraId, onScanSuccess]);
+  }, [destroyScanner, handleScanHit]);
 
-  const stopScanning = useCallback(async () => {
-    if (!isScanningRef.current) return;          // not scanning — skip
-    try { await scannerRef.current.stop(); } catch (e) {}
-    isScanningRef.current = false;
-    setUiScanning(false);
-  }, []);
-
-  // Auto-start when camera is selected — runs once per camera change
   useEffect(() => {
     if (!selectedCameraId) return;
     let cancelled = false;
     const t = setTimeout(async () => {
       if (!cancelled) await startScanning(selectedCameraId);
-    }, 400);
+    }, 300);
     return () => {
       cancelled = true;
       clearTimeout(t);
+      destroyScanner();
     };
-  }, [selectedCameraId]);   // intentionally NOT including startScanning to avoid re-trigger
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (isScanningRef.current && scannerRef.current) {
-        scannerRef.current.stop().catch(() => {});
-        isScanningRef.current = false;
-      }
-    };
-  }, []);
+  }, [selectedCameraId, startScanning, destroyScanner]);
 
   const handleManual = (e) => {
     e.preventDefault();
     if (!manualId.trim()) return;
-    if (onScanSuccess) onScanSuccess(manualId.trim());
+    handleScanHit(manualId.trim());
     setManualId("");
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      let qrInstance = scannerRef.current;
+      if (!qrInstance) {
+        qrInstance = new Html5Qrcode(CONTAINER_ID, { verbose: false });
+      }
+      const decodedText = await qrInstance.scanFile(file, true);
+      if (decodedText) {
+        handleScanHit(decodedText);
+      }
+    } catch (err) {
+      console.warn("QR File Scan Error:", err);
+      setCameraError("Could not read QR code from the uploaded image.");
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   return (
     <div className="flex flex-col items-center w-full space-y-4">
-
       {/* Camera Viewport */}
       <div className="relative w-full aspect-square rounded-2xl bg-slate-900 border-2 border-blue-500/30 overflow-hidden shadow-md flex items-center justify-center">
         <div id={CONTAINER_ID} className="w-full h-full" />
 
         {/* Scan-frame overlay */}
-        <div className="absolute inset-0 pointer-events-none border-[28px] border-slate-900/60 flex items-center justify-center">
-          <div className="relative w-52 h-52 border-2 border-blue-400 rounded-2xl">
-            <div className="absolute -top-1 -left-1 w-5 h-5 border-t-4 border-l-4 border-blue-500 rounded-tl-lg" />
-            <div className="absolute -top-1 -right-1 w-5 h-5 border-t-4 border-r-4 border-blue-500 rounded-tr-lg" />
-            <div className="absolute -bottom-1 -left-1 w-5 h-5 border-b-4 border-l-4 border-blue-500 rounded-bl-lg" />
-            <div className="absolute -bottom-1 -right-1 w-5 h-5 border-b-4 border-r-4 border-blue-500 rounded-br-lg" />
+        <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+          <div className="relative w-56 h-56 border-2 border-blue-400/80 rounded-2xl">
+            <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-blue-500 rounded-tl-lg" />
+            <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-blue-500 rounded-tr-lg" />
+            <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-blue-500 rounded-bl-lg" />
+            <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-blue-500 rounded-br-lg" />
             {uiScanning && (
-              <div className="absolute inset-x-2 h-0.5 top-1/2 bg-gradient-to-r from-transparent via-blue-400 to-transparent shadow-lg shadow-blue-400/60 animate-bounce" />
+              <div className="absolute inset-x-2 h-0.5 top-1/2 bg-gradient-to-r from-transparent via-blue-400 to-transparent shadow-lg shadow-blue-400/80 animate-pulse" />
             )}
           </div>
         </div>
@@ -131,7 +202,7 @@ export const PayrollQRScanner = ({ onScanSuccess, lastResult }) => {
         {/* Success flash */}
         {lastResult?.success && (
           <div className="absolute inset-0 bg-emerald-500/20 flex items-center justify-center pointer-events-none z-20">
-            <CheckCircle2 className="w-16 h-16 text-emerald-400 drop-shadow-lg" />
+            <CheckCircle2 className="w-16 h-16 text-emerald-400 drop-shadow-lg animate-bounce" />
           </div>
         )}
       </div>
@@ -149,6 +220,7 @@ export const PayrollQRScanner = ({ onScanSuccess, lastResult }) => {
             ))}
           </select>
         )}
+        
         {uiScanning ? (
           <button onClick={stopScanning} className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold flex items-center gap-1.5 transition ml-auto">
             <CameraOff className="w-3.5 h-3.5" /><span>Pause</span>
@@ -158,6 +230,22 @@ export const PayrollQRScanner = ({ onScanSuccess, lastResult }) => {
             <Camera className="w-3.5 h-3.5" /><span>Resume</span>
           </button>
         )}
+
+        <input
+          type="file"
+          ref={fileInputRef}
+          accept="image/*"
+          onChange={handleFileUpload}
+          className="hidden"
+        />
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          title="Upload image with QR code"
+          className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition"
+        >
+          <ImageIcon className="w-3.5 h-3.5 text-blue-600" />
+          <span className="hidden sm:inline">Upload Image</span>
+        </button>
       </div>
 
       {/* Result Banner */}

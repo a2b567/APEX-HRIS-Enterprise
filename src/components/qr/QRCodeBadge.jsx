@@ -69,14 +69,14 @@ export const QRCodeBadge = ({ employee, branch, onRegenerate }) => {
 
         {/* QR Code Canvas */}
         <div className="my-5 flex justify-center" ref={qrRef}>
-          <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
+          <div className="p-3.5 bg-white rounded-2xl border-2 border-slate-200 shadow-md">
             <QRCodeCanvas
               value={payloadString}
-              size={180}
-              level="H"
-              includeMargin={false}
-              bgColor="#f8fafc"
-              fgColor="#0f172a"
+              size={200}
+              level="L"
+              includeMargin={true}
+              bgColor="#ffffff"
+              fgColor="#000000"
             />
           </div>
         </div>

@@ -163,15 +163,14 @@ export const QRCodeCenter = () => {
                   </span>
                 </div>
 
-                {/* QR Canvas Container */}
-                <div className="my-3.5 flex justify-center p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <div className="my-3.5 flex justify-center p-3 bg-white rounded-xl border-2 border-slate-200 shadow-md">
                   <QRCodeCanvas
                     value={payloadString}
-                    size={130}
-                    level="H"
-                    includeMargin={false}
-                    bgColor="#f8fafc"
-                    fgColor="#0f172a"
+                    size={150}
+                    level="L"
+                    includeMargin={true}
+                    bgColor="#ffffff"
+                    fgColor="#000000"
                   />
                 </div>
 
