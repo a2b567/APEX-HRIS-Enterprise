@@ -3,6 +3,7 @@ import { INITIAL_USERS } from '../data/mockData';
 import { api } from '../services/api';
 import { rateLimiter } from '../security/rateLimiter';
 import auditLogger from '../security/auditLogger';
+import { secureStorage } from '../utils/securityUtils';
 
 const AuthContext = createContext(null);
 
@@ -87,11 +88,13 @@ export const AuthProvider = ({ children }) => {
     // 2. Fallback check against stored users
     let allUsers = INITIAL_USERS;
     try {
-      const saved = localStorage.getItem('dtr_payroll_database_v6_5sup_users') || localStorage.getItem('dtr_payroll_database_v5_testemp_users');
+      const saved =
+        secureStorage.getItem('dtr_payroll_database_v6_5sup_users') ||
+        secureStorage.getItem('dtr_payroll_database_v5_testemp_users') ||
+        localStorage.getItem('dtr_payroll_database_v6_5sup_users');
       if (saved) {
-        const parsed = JSON.parse(saved);
+        const parsed = Array.isArray(saved) ? saved : JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Only guarantee the Super Admin (id: 1) is always present; respect deletions for others
           const superAdmin = INITIAL_USERS.find((u) => u.id === 1);
           const hasAdmin = parsed.some((u) => u.id === 1);
           allUsers = superAdmin && !hasAdmin ? [superAdmin, ...parsed] : parsed;
@@ -102,13 +105,15 @@ export const AuthProvider = ({ children }) => {
     }
 
     const q = username.trim().toLowerCase();
-    // Match by name, username, email, or employee ID
+    // Match by exact username, email, employee ID, exact name, or name starting with query
     const matched = allUsers.find(
       (u) =>
-        (u.name && u.name.toLowerCase() === q) ||
         (u.username && u.username.toLowerCase() === q) ||
         (u.email && u.email.toLowerCase() === q) ||
-        (u.employeeId && u.employeeId.toLowerCase() === q)
+        (u.employeeId && u.employeeId.toLowerCase() === q) ||
+        (u.name && u.name.toLowerCase() === q) ||
+        (u.name && u.name.toLowerCase().startsWith(q)) ||
+        (u.name && u.name.toLowerCase().includes(q))
     );
 
     if (!matched) {
@@ -178,9 +183,12 @@ export const AuthProvider = ({ children }) => {
   const loginAsDemoRole = (role, targetBranchId = null) => {
     let allUsers = INITIAL_USERS;
     try {
-      const saved = localStorage.getItem('dtr_payroll_database_v4_nodemo_users');
+      const saved =
+        secureStorage.getItem('dtr_payroll_database_v6_5sup_users') ||
+        secureStorage.getItem('dtr_payroll_database_v5_testemp_users') ||
+        localStorage.getItem('dtr_payroll_database_v6_5sup_users');
       if (saved) {
-        const parsed = JSON.parse(saved);
+        const parsed = Array.isArray(saved) ? saved : JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           allUsers = parsed;
         }
