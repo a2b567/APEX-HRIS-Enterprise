@@ -45,7 +45,7 @@ export const SettingsModule = () => {
   };
 
   const [formData, setFormData] = useState({
-    companyName: settings?.companyName || 'APEX HRIS Enterprise',
+    companyName: settings?.companyName || 'REDMART HRIS Enterprise',
     companyTagline: settings?.companyTagline || 'Enterprise Multi-Branch HRIS & Payroll Platform',
     taxIdNumber: '123-456-789-000',
     ...settings,

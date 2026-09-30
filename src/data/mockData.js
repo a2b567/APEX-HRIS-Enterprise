@@ -186,8 +186,8 @@ export const generateInitialAttendanceLogs = () => [];
 
 // Standard Company Policy & Payroll Settings
 export const INITIAL_SETTINGS = {
-  companyName: 'APEX HRIS Enterprise',
-  systemTitle: 'APEX HRIS Enterprise',
+  companyName: 'REDMART HRIS Enterprise',
+  systemTitle: 'REDMART HRIS Enterprise',
   companyTagline: 'Enterprise Multi-Branch HRIS & Payroll Platform',
   taxIdNumber: '',
   standardWorkHoursPerDay: 8,

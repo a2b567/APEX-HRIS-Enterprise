@@ -194,7 +194,7 @@ export const LoginPage = () => {
       if (res.success && res.user) {
         addToast({
           title: 'ID Verified & Account Created',
-          message: res.message || `Welcome to APEX HRIS Enterprise, ${res.user.name}! ID confirmed.`,
+          message: res.message || `Welcome to REDMART HRIS Enterprise, ${res.user.name}! ID confirmed.`,
           type: 'success',
         });
         loginUserDirectly(res.user);
@@ -230,7 +230,7 @@ export const LoginPage = () => {
             </div>
             <div>
               <h2 className="text-[17px] font-bold tracking-tight text-white leading-snug">
-                APEX HRIS Enterprise
+                REDMART HRIS Enterprise
               </h2>
               <p className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">
                 HUMAN RESOURCE INFORMATION SYSTEM
