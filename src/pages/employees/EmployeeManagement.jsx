@@ -73,29 +73,142 @@ export const EmployeeManagement = () => {
   ];
 
   const downloadTemplate = () => {
-    const sampleRow = [
-      'Juan Dela Cruz', 'juan@company.com', '+63 917 000 0001',
-      branches[0]?.id || 'BRANCH-001', 'Operations', 'Front Desk Staff',
-      'Regular Full-Time', '750', 'Active', '', '', '', '', '', 'juan.cruz', 'Emp@123',
+    const targetBranch = (isSuperAdmin ? branches[0]?.id : supervisorBranchId) || 'BRANCH-001';
+
+    const headers = [
+      'Full Name',
+      'Email Address',
+      'Phone Number',
+      'Branch ID',
+      'Department',
+      'Position',
+      'Employment Type',
+      'Daily Rate (PHP)',
+      'Status',
+      'TIN Number',
+      'SSS Number',
+      'PhilHealth Number',
+      'Pag-IBIG Number',
+      'Bank Account Number',
+      'Portal Username',
+      'Initial Password',
     ];
-    const csvContent = [CSV_TEMPLATE_HEADERS.join(','), sampleRow.join(',')].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
+
+    const sampleRows = [
+      [
+        'Juan Dela Cruz',
+        'juan.delacruz@company.ph',
+        '+63 917 123 4567',
+        targetBranch,
+        'Operations',
+        'Front Desk Officer',
+        'Regular Full-Time',
+        '850',
+        'Active',
+        '123-456-789-000',
+        '34-1234567-8',
+        '12-345678901-2',
+        '1234-5678-9012',
+        '1092837465',
+        'juan.delacruz',
+        'Emp@2026',
+      ],
+      [
+        'Maria Santos',
+        'maria.santos@company.ph',
+        '+63 918 987 6543',
+        targetBranch,
+        'Logistics & Warehouse',
+        'Inventory Clerk',
+        'Regular Full-Time',
+        '750',
+        'Active',
+        '234-567-890-000',
+        '34-8765432-1',
+        '12-987654321-0',
+        '2345-6789-0123',
+        '5098765432',
+        'maria.santos',
+        'Emp@2026',
+      ],
+      [
+        'Mark Anthony Reyes',
+        'mark.reyes@company.ph',
+        '+63 920 555 1234',
+        targetBranch,
+        'Sales & Retail',
+        'Cashier Associate',
+        'Probationary',
+        '650',
+        'Active',
+        '345-678-901-000',
+        '34-5551234-9',
+        '12-555123456-7',
+        '3456-7890-1234',
+        '7012345678',
+        'mark.reyes',
+        'Emp@2026',
+      ],
+      [
+        'Elena Bautista',
+        'elena.bautista@company.ph',
+        '+63 922 444 8899',
+        targetBranch,
+        'Security & Safety',
+        'Security Personnel',
+        'Regular Full-Time',
+        '700',
+        'Active',
+        '456-789-012-000',
+        '34-4448899-0',
+        '12-444889900-1',
+        '4567-8901-2345',
+        '8098761234',
+        'elena.bautista',
+        'Emp@2026',
+      ],
+    ];
+
+    const formatRow = (row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',');
+    const csvRows = [formatRow(headers), ...sampleRows.map(formatRow)].join('\r\n');
+    
+    // Add UTF-8 BOM (\uFEFF) for crystal clear opening in Excel, WPS, and Google Sheets
+    const blob = new Blob(['\uFEFF' + csvRows], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'apex_employee_import_template.csv';
+    a.download = `apex_employee_import_template_${targetBranch.toLowerCase()}.csv`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
+
+    addToast({
+      title: 'Template Downloaded',
+      message: 'Professional Excel/WPS compatible CSV template generated.',
+      type: 'success',
+    });
   };
 
   const parseCsvRow = (line) => {
     const result = [];
     let current = '';
     let inQuotes = false;
-    for (const ch of line) {
-      if (ch === '"') { inQuotes = !inQuotes; }
-      else if (ch === ',' && !inQuotes) { result.push(current.trim()); current = ''; }
-      else { current += ch; }
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"';
+          i++; // skip escaped quote
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (ch === ',' && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += ch;
+      }
     }
     result.push(current.trim());
     return result;
@@ -107,41 +220,74 @@ export const EmployeeManagement = () => {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = ev.target.result;
-      const lines = text.split(/\r?\n/).filter((l) => l.trim());
+      const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
       if (lines.length < 2) {
         addToast({ title: 'Empty File', message: 'CSV has no data rows.', type: 'error' });
         return;
       }
-      const headers = parseCsvRow(lines[0]).map((h) => h.toLowerCase().replace(/\s+/g, ''));
+
+      // Normalized clean header mapper
+      const rawHeaders = parseCsvRow(lines[0]);
+      const normalizedHeaders = rawHeaders.map((h) => h.toLowerCase().replace(/[^a-z0-9]/g, ''));
+
+      const getVal = (vals, ...keys) => {
+        for (const key of keys) {
+          const idx = normalizedHeaders.indexOf(key);
+          if (idx !== -1 && vals[idx] !== undefined && vals[idx] !== '') {
+            return vals[idx];
+          }
+        }
+        return '';
+      };
+
       const rows = [];
       const errs = [];
+
       lines.slice(1).forEach((line, idx) => {
         const vals = parseCsvRow(line);
-        const row = {};
-        headers.forEach((h, i) => { row[h] = vals[i] || ''; });
-        if (!row.name) errs.push(`Row ${idx + 2}: Missing employee name`);
-        if (!row.position) errs.push(`Row ${idx + 2}: Missing position`);
+        const name = getVal(vals, 'fullname', 'name', 'employeename');
+        const position = getVal(vals, 'position', 'jobtitle', 'role');
+
+        if (!name) errs.push(`Row ${idx + 2}: Missing employee name`);
+        if (!position) errs.push(`Row ${idx + 2}: Missing position`);
+
+        const email = getVal(vals, 'emailaddress', 'email');
+        const phone = getVal(vals, 'phonenumber', 'phone', 'contactnumber', 'mobile');
+        const branchId = getVal(vals, 'branchid', 'branch', 'branchcode') || (isSuperAdmin ? (branches[0]?.id || 'BRANCH-001') : supervisorBranchId);
+        const department = getVal(vals, 'department', 'dept') || 'Operations';
+        const employmentType = getVal(vals, 'employmenttype', 'type') || 'Regular Full-Time';
+        const dailyRate = Number(getVal(vals, 'dailyratephp', 'dailyrate', 'rate', 'salary')) || 750;
+        const status = getVal(vals, 'status') || 'Active';
+        const tin = getVal(vals, 'tinnumber', 'tin');
+        const sss = getVal(vals, 'sssnumber', 'sss');
+        const philhealth = getVal(vals, 'philhealthnumber', 'philhealth');
+        const pagibig = getVal(vals, 'pagibignumber', 'pagibig', 'hdmf');
+        const bankAccount = getVal(vals, 'bankaccountnumber', 'bankaccount', 'accountnumber');
+        const username = getVal(vals, 'portalusername', 'username', 'loginusername');
+        const password = getVal(vals, 'initialpassword', 'password', 'accountpassword') || 'Emp@2026';
+
         rows.push({
-          name: row.name || '',
-          email: row.email || '',
-          phone: row.phone || '',
-          branchId: row.branchid || row.branchId || (isSuperAdmin ? '' : supervisorBranchId),
-          department: row.department || 'Operations',
-          position: row.position || '',
-          employmentType: row.employmenttype || row.employmentType || 'Regular Full-Time',
-          dailyRate: Number(row.dailyrate || row.dailyRate) || 750,
-          hourlyRate: Number((Number(row.dailyrate || row.dailyRate || 750) / 8).toFixed(2)),
-          status: row.status || 'Active',
-          tin: row.tin || '',
-          sss: row.sss || '',
-          philhealth: row.philhealth || '',
-          pagibig: row.pagibig || '',
-          bankAccount: row.bankaccount || row.bankAccount || '',
-          username: row.username || '',
-          accountPassword: row.password || 'Emp@123',
-          createAccount: !!(row.username),
+          name: name || '',
+          email,
+          phone,
+          branchId,
+          department,
+          position: position || '',
+          employmentType,
+          dailyRate,
+          hourlyRate: Number((dailyRate / 8).toFixed(2)),
+          status,
+          tin,
+          sss,
+          philhealth,
+          pagibig,
+          bankAccount,
+          username,
+          accountPassword: password,
+          createAccount: !!username || true,
         });
       });
+
       setImportPreview(rows);
       setImportErrors(errs);
       setImportModalOpen(true);
