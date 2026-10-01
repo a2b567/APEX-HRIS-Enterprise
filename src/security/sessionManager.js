@@ -1,4 +1,4 @@
-﻿/**
+/**
  * APEX HRIS – Session Manager (P0 – Critical)
  * --------------------------------------------
  * Handles:
@@ -81,14 +81,16 @@ export const sessionManager = {
     warnCb   = null;
   },
 
-  /** Call whenever user manually logs out — clears session data */
+  /** Call whenever user manually logs out — clears auth token session data only */
   invalidate() {
     this.stop();
-    // Clear all APEX session artifacts
+    // Clear session storage artifacts
     sessionStorage.clear();
-    // Remove auth-related localStorage keys
+    // Remove auth-related token keys ONLY — DO NOT remove database data tables (APEX_ENC_dtr_payroll_database_*)
     const keysToRemove = Object.keys(localStorage).filter(
-      (k) => k.startsWith('APEX_') || k.startsWith('dtr_payroll_auth')
+      (k) =>
+        (k.startsWith('APEX_AUTH_') || k.startsWith('dtr_payroll_auth_') || k.includes('auth_user')) &&
+        !k.includes('_database_')
     );
     keysToRemove.forEach((k) => localStorage.removeItem(k));
   },

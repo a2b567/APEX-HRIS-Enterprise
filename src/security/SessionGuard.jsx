@@ -1,4 +1,4 @@
-﻿/**
+/**
  * APEX HRIS – Session Guard Component (P0 – Critical)
  * ----------------------------------------------------
  * Global wrapper that:
@@ -121,7 +121,7 @@ const SessionGuard = ({ children }) => {
                     Your session has been idle for 13 minutes. For your security,
                     you will be automatically logged out in{' '}
                     <strong>{secondsLeft} seconds</strong>.
-                    Any unsaved data may be lost.
+                    Click <strong>Stay Logged In</strong> to continue working.
                   </span>
                 </div>
               </div>
