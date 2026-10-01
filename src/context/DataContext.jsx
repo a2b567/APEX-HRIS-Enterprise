@@ -15,6 +15,9 @@ import {
   deleteEmployeeFromSupabase,
   deleteBranchFromSupabase,
   isSupabaseConfigured,
+  fetchUsersFromSupabase,
+  fetchEmployeesFromSupabase,
+  supabase,
 } from '../services/supabaseClient';
 
 export const DataContext = createContext(null);
@@ -136,6 +139,58 @@ export const DataProvider = ({ children }) => {
   useEffect(() => {
     secureStorage.setItem(`${STORAGE_KEY_DATA}_disbursements`, disbursements);
   }, [disbursements]);
+
+  // ── Multi-Tab Real-Time Storage Listener ─────────────────────────────────
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (!e.key) return;
+      if (e.key.includes(`${STORAGE_KEY_DATA}_users`) || e.key.includes(`APEX_ENC_${STORAGE_KEY_DATA}_users`)) {
+        const updated = secureStorage.getItem(`${STORAGE_KEY_DATA}_users`);
+        if (updated && Array.isArray(updated)) setUsers(updated);
+      }
+      if (e.key.includes(`${STORAGE_KEY_DATA}_branches`) || e.key.includes(`APEX_ENC_${STORAGE_KEY_DATA}_branches`)) {
+        const updated = secureStorage.getItem(`${STORAGE_KEY_DATA}_branches`);
+        if (updated && Array.isArray(updated)) setBranches(updated);
+      }
+      if (e.key.includes(`${STORAGE_KEY_DATA}_employees`) || e.key.includes(`APEX_ENC_${STORAGE_KEY_DATA}_employees`)) {
+        const updated = secureStorage.getItem(`${STORAGE_KEY_DATA}_employees`);
+        if (updated && Array.isArray(updated)) setEmployees(updated);
+      }
+      if (e.key.includes(`${STORAGE_KEY_DATA}_attendance`) || e.key.includes(`APEX_ENC_${STORAGE_KEY_DATA}_attendance`)) {
+        const updated = secureStorage.getItem(`${STORAGE_KEY_DATA}_attendance`);
+        if (updated && Array.isArray(updated)) setAttendanceLogs(updated);
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  // ── Supabase Real-Time Channel Subscription (Cross-Device Sync) ──────────
+  useEffect(() => {
+    if (!isSupabaseConfigured() || !supabase) return;
+
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, async () => {
+        try {
+          const cloudUsers = await fetchUsersFromSupabase();
+          if (cloudUsers && cloudUsers.length > 0) setUsers(cloudUsers);
+        } catch (e) {}
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'employees' }, async () => {
+        try {
+          const cloudEmps = await fetchEmployeesFromSupabase();
+          if (cloudEmps && cloudEmps.length > 0) setEmployees(cloudEmps);
+        } catch (e) {}
+      })
+      .subscribe();
+
+    return () => {
+      try {
+        supabase.removeChannel(channel);
+      } catch (e) {}
+    };
+  }, []);
 
   // Reset database back to clean seed
   const resetToFactoryDefaults = () => {
