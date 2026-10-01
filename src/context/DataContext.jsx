@@ -17,8 +17,14 @@ import {
   isSupabaseConfigured,
   fetchUsersFromSupabase,
   fetchEmployeesFromSupabase,
+  fetchBranchesFromSupabase,
+  fetchAttendanceLogsFromSupabase,
+  fetchDisbursementsFromSupabase,
   syncUserToSupabase,
   syncEmployeeToSupabase,
+  syncBranchToSupabase,
+  logAttendanceToSupabase,
+  syncDisbursementToSupabase,
   supabase,
 } from '../services/supabaseClient';
 
@@ -199,41 +205,66 @@ export const DataProvider = ({ children }) => {
     if (!isSupabaseConfigured()) return;
     const syncCloudDataOnMount = async () => {
       try {
-        const [cloudUsers, cloudEmployees] = await Promise.all([
+        const [cloudUsers, cloudEmployees, cloudBranches, cloudAttendance, cloudDisbursements] = await Promise.all([
           fetchUsersFromSupabase(),
           fetchEmployeesFromSupabase(),
+          fetchBranchesFromSupabase(),
+          fetchAttendanceLogsFromSupabase(),
+          fetchDisbursementsFromSupabase(),
         ]);
 
-        // 1. Merge Local Users with Cloud Users & Upload unsynced to Supabase Cloud
+        // 1. Users
         const localUsers = secureStorage.getItem(`${STORAGE_KEY_DATA}_users`) || INITIAL_USERS;
         const mergedUsers = Array.isArray(cloudUsers) && cloudUsers.length > 0 ? [...cloudUsers] : [];
-
         localUsers.forEach((lUser) => {
           if (!mergedUsers.some((u) => u.id === lUser.id || (u.username && u.username.toLowerCase() === lUser.username?.toLowerCase()))) {
             mergedUsers.push(lUser);
             syncUserToSupabase(lUser).catch(() => {});
           }
         });
-
         if (mergedUsers.length > 0) {
           setUsers(mergedUsers);
           secureStorage.setItem(`${STORAGE_KEY_DATA}_users`, mergedUsers);
         }
 
-        // 2. Merge Local Employees with Cloud Employees & Upload unsynced to Supabase Cloud
+        // 2. Employees
         const localEmployees = secureStorage.getItem(`${STORAGE_KEY_DATA}_employees`) || INITIAL_EMPLOYEES;
         const mergedEmployees = Array.isArray(cloudEmployees) && cloudEmployees.length > 0 ? [...cloudEmployees] : [];
-
         localEmployees.forEach((lEmp) => {
           if (!mergedEmployees.some((e) => e.id === lEmp.id || (e.name && e.name.toLowerCase() === lEmp.name?.toLowerCase()))) {
             mergedEmployees.push(lEmp);
             syncEmployeeToSupabase(lEmp).catch(() => {});
           }
         });
-
         if (mergedEmployees.length > 0) {
           setEmployees(mergedEmployees);
           secureStorage.setItem(`${STORAGE_KEY_DATA}_employees`, mergedEmployees);
+        }
+
+        // 3. Branches
+        const localBranches = secureStorage.getItem(`${STORAGE_KEY_DATA}_branches`) || INITIAL_BRANCHES;
+        const mergedBranches = Array.isArray(cloudBranches) && cloudBranches.length > 0 ? [...cloudBranches] : [];
+        localBranches.forEach((lBranch) => {
+          if (!mergedBranches.some((b) => b.id === lBranch.id)) {
+            mergedBranches.push(lBranch);
+            syncBranchToSupabase(lBranch).catch(() => {});
+          }
+        });
+        if (mergedBranches.length > 0) {
+          setBranches(mergedBranches);
+          secureStorage.setItem(`${STORAGE_KEY_DATA}_branches`, mergedBranches);
+        }
+
+        // 4. Attendance Logs
+        if (Array.isArray(cloudAttendance) && cloudAttendance.length > 0) {
+          setAttendanceLogs(cloudAttendance);
+          secureStorage.setItem(`${STORAGE_KEY_DATA}_attendance`, cloudAttendance);
+        }
+
+        // 5. Disbursements
+        if (cloudDisbursements && Object.keys(cloudDisbursements).length > 0) {
+          setDisbursements(cloudDisbursements);
+          secureStorage.setItem(`${STORAGE_KEY_DATA}_disbursements`, cloudDisbursements);
         }
       } catch (err) {
         console.warn('[Supabase Sync] Mount sync error:', err);
@@ -426,6 +457,11 @@ export const DataProvider = ({ children }) => {
     };
 
     setBranches((prev) => [...prev, newBranch]);
+
+    if (isSupabaseConfigured()) {
+      syncBranchToSupabase(newBranch).catch(() => {});
+    }
+
     return { success: true, branch: newBranch };
   };
 
@@ -454,6 +490,11 @@ export const DataProvider = ({ children }) => {
     setBranches((prev) =>
       prev.map((b) => (b.id === branchId ? { ...b, ...updates } : b))
     );
+
+    if (isSupabaseConfigured()) {
+      const b = branches.find((br) => br.id === branchId);
+      if (b) syncBranchToSupabase({ ...b, ...updates }).catch(() => {});
+    }
     return { success: true };
   };
 

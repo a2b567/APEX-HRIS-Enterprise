@@ -232,4 +232,123 @@ export const deleteBranchFromSupabase = async (branchId) => {
   }
 };
 
+export const syncBranchToSupabase = async (b) => {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const { data, error } = await supabase
+      .from('branches')
+      .upsert(
+        {
+          id: b.id,
+          code: b.code || null,
+          name: b.name,
+          location: b.location || null,
+          contact_number: b.contactNumber || null,
+          email: b.email || null,
+          supervisor_id: b.supervisorId ? Number(b.supervisorId) : null,
+          status: b.status || 'Active',
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'id' }
+      )
+      .select()
+      .single();
+    if (error) console.warn('[Supabase] syncBranch error:', error.message);
+    return data;
+  } catch (err) {
+    console.warn('[Supabase] syncBranch exception:', err);
+    return null;
+  }
+};
+
+export const fetchBranchesFromSupabase = async () => {
+  if (!isSupabaseConfigured()) return [];
+  try {
+    const { data, error } = await supabase.from('branches').select('*').order('id', { ascending: true });
+    if (error) return [];
+    return (data || []).map((b) => ({
+      id: b.id,
+      code: b.code,
+      name: b.name,
+      location: b.location,
+      contactNumber: b.contact_number,
+      email: b.email,
+      supervisorId: b.supervisor_id ? Number(b.supervisor_id) : null,
+      status: b.status,
+    }));
+  } catch (err) {
+    return [];
+  }
+};
+
+export const fetchAttendanceLogsFromSupabase = async () => {
+  if (!isSupabaseConfigured()) return [];
+  try {
+    const { data, error } = await supabase.from('attendance_logs').select('*').order('date', { ascending: false });
+    if (error) return [];
+    return (data || []).map((l) => ({
+      id: l.id,
+      employeeId: l.employee_id,
+      employeeName: l.employee_name,
+      branchId: l.branch_id,
+      date: l.date,
+      timeIn: l.time_in,
+      timeOut: l.time_out,
+      breakMinutes: Number(l.break_minutes) || 60,
+      regularHours: Number(l.regular_hours) || 0,
+      overtimeHours: Number(l.overtime_hours) || 0,
+      lateMinutes: Number(l.late_minutes) || 0,
+      undertimeMinutes: Number(l.undertime_minutes) || 0,
+      status: l.status,
+      method: l.method,
+      remarks: l.remarks,
+      isManual: Boolean(l.is_manual),
+    }));
+  } catch (err) {
+    return [];
+  }
+};
+
+export const syncDisbursementToSupabase = async (key, record) => {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const parts = key.split('_');
+    const empId = parts[0] || record.employeeId;
+    const month = parts[1] || 'month';
+    const cutoff = parts[2] || 'cutoff';
+
+    const { data, error } = await supabase
+      .from('disbursements')
+      .upsert(
+        {
+          id: key,
+          employee_id: empId,
+          month_year: month,
+          cutoff_type: cutoff,
+          record: record,
+        },
+        { onConflict: 'id' }
+      );
+    if (error) console.warn('[Supabase] syncDisbursement error:', error.message);
+    return data;
+  } catch (err) {
+    return null;
+  }
+};
+
+export const fetchDisbursementsFromSupabase = async () => {
+  if (!isSupabaseConfigured()) return {};
+  try {
+    const { data, error } = await supabase.from('disbursements').select('*');
+    if (error) return {};
+    const map = {};
+    (data || []).forEach((row) => {
+      map[row.id] = row.record;
+    });
+    return map;
+  } catch (err) {
+    return {};
+  }
+};
+
 export default supabase;
