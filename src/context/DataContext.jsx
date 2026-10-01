@@ -194,7 +194,7 @@ export const DataProvider = ({ children }) => {
     };
   }, []);
 
-  // ── Initial Cloud Fetch from Supabase (Cross-Device Database Sync) ─────────
+  // ── Initial Cloud Sync & Bidirectional Merge (Cross-Device Database Sync) ──
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
     const syncCloudDataOnMount = async () => {
@@ -204,18 +204,36 @@ export const DataProvider = ({ children }) => {
           fetchEmployeesFromSupabase(),
         ]);
 
-        if (cloudUsers && cloudUsers.length > 0) {
-          setUsers(cloudUsers);
-          secureStorage.setItem(`${STORAGE_KEY_DATA}_users`, cloudUsers);
-        } else {
-          INITIAL_USERS.forEach((u) => syncUserToSupabase(u).catch(() => {}));
+        // 1. Merge Local Users with Cloud Users & Upload unsynced to Supabase Cloud
+        const localUsers = secureStorage.getItem(`${STORAGE_KEY_DATA}_users`) || INITIAL_USERS;
+        const mergedUsers = Array.isArray(cloudUsers) && cloudUsers.length > 0 ? [...cloudUsers] : [];
+
+        localUsers.forEach((lUser) => {
+          if (!mergedUsers.some((u) => u.id === lUser.id || (u.username && u.username.toLowerCase() === lUser.username?.toLowerCase()))) {
+            mergedUsers.push(lUser);
+            syncUserToSupabase(lUser).catch(() => {});
+          }
+        });
+
+        if (mergedUsers.length > 0) {
+          setUsers(mergedUsers);
+          secureStorage.setItem(`${STORAGE_KEY_DATA}_users`, mergedUsers);
         }
 
-        if (cloudEmployees && cloudEmployees.length > 0) {
-          setEmployees(cloudEmployees);
-          secureStorage.setItem(`${STORAGE_KEY_DATA}_employees`, cloudEmployees);
-        } else {
-          INITIAL_EMPLOYEES.forEach((e) => syncEmployeeToSupabase(e).catch(() => {}));
+        // 2. Merge Local Employees with Cloud Employees & Upload unsynced to Supabase Cloud
+        const localEmployees = secureStorage.getItem(`${STORAGE_KEY_DATA}_employees`) || INITIAL_EMPLOYEES;
+        const mergedEmployees = Array.isArray(cloudEmployees) && cloudEmployees.length > 0 ? [...cloudEmployees] : [];
+
+        localEmployees.forEach((lEmp) => {
+          if (!mergedEmployees.some((e) => e.id === lEmp.id || (e.name && e.name.toLowerCase() === lEmp.name?.toLowerCase()))) {
+            mergedEmployees.push(lEmp);
+            syncEmployeeToSupabase(lEmp).catch(() => {});
+          }
+        });
+
+        if (mergedEmployees.length > 0) {
+          setEmployees(mergedEmployees);
+          secureStorage.setItem(`${STORAGE_KEY_DATA}_employees`, mergedEmployees);
         }
       } catch (err) {
         console.warn('[Supabase Sync] Mount sync error:', err);
