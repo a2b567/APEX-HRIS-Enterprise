@@ -17,6 +17,8 @@ import {
   isSupabaseConfigured,
   fetchUsersFromSupabase,
   fetchEmployeesFromSupabase,
+  syncUserToSupabase,
+  syncEmployeeToSupabase,
   supabase,
 } from '../services/supabaseClient';
 
@@ -192,6 +194,37 @@ export const DataProvider = ({ children }) => {
     };
   }, []);
 
+  // ── Initial Cloud Fetch from Supabase (Cross-Device Database Sync) ─────────
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    const syncCloudDataOnMount = async () => {
+      try {
+        const [cloudUsers, cloudEmployees] = await Promise.all([
+          fetchUsersFromSupabase(),
+          fetchEmployeesFromSupabase(),
+        ]);
+
+        if (cloudUsers && cloudUsers.length > 0) {
+          setUsers(cloudUsers);
+          secureStorage.setItem(`${STORAGE_KEY_DATA}_users`, cloudUsers);
+        } else {
+          INITIAL_USERS.forEach((u) => syncUserToSupabase(u).catch(() => {}));
+        }
+
+        if (cloudEmployees && cloudEmployees.length > 0) {
+          setEmployees(cloudEmployees);
+          secureStorage.setItem(`${STORAGE_KEY_DATA}_employees`, cloudEmployees);
+        } else {
+          INITIAL_EMPLOYEES.forEach((e) => syncEmployeeToSupabase(e).catch(() => {}));
+        }
+      } catch (err) {
+        console.warn('[Supabase Sync] Mount sync error:', err);
+      }
+    };
+
+    syncCloudDataOnMount();
+  }, []);
+
   // Reset database back to clean seed
   const resetToFactoryDefaults = () => {
     setBranches(INITIAL_BRANCHES);
@@ -276,6 +309,10 @@ export const DataProvider = ({ children }) => {
       );
     }
 
+    if (isSupabaseConfigured()) {
+      syncUserToSupabase(newSupervisor).catch(() => {});
+    }
+
     return { success: true, supervisor: newSupervisor };
   };
 
@@ -308,6 +345,13 @@ export const DataProvider = ({ children }) => {
           return b;
         })
       );
+    }
+
+    if (isSupabaseConfigured()) {
+      const targetUser = users.find((u) => u.id === Number(id));
+      if (targetUser) {
+        syncUserToSupabase({ ...targetUser, ...updatedFields }).catch(() => {});
+      }
     }
 
     return { success: true };
@@ -496,6 +540,12 @@ export const DataProvider = ({ children }) => {
     };
 
     setEmployees((prev) => [...prev, newEmployee]);
+
+    if (isSupabaseConfigured()) {
+      syncEmployeeToSupabase(newEmployee).catch(() => {});
+      if (createdUser) syncUserToSupabase(createdUser).catch(() => {});
+    }
+
     return { success: true, employee: newEmployee, user: createdUser };
   };
 
@@ -587,6 +637,13 @@ export const DataProvider = ({ children }) => {
           : e
       )
     );
+
+    if (isSupabaseConfigured()) {
+      const emp = employees.find((e) => e.id === employeeId || (e.uid && updates.uid && e.uid === updates.uid));
+      if (emp) {
+        syncEmployeeToSupabase({ ...emp, ...updates }).catch(() => {});
+      }
+    }
     return { success: true };
   };
 
