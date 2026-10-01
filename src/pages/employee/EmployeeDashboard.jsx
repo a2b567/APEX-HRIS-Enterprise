@@ -22,17 +22,23 @@ import { useToast } from '../../components/shared/Toast';
 
 export const EmployeeDashboard = () => {
   const { user } = useAuth();
-  const { branches, employees, attendanceLogs, recordPunch, settings } = useData();
+  const { branches, employees, attendanceLogs, recordPunch, settings, getDisbursementStatus } = useData();
   const { formattedTime, formattedDate, greeting, currentTimeHHMM } = useClock();
   const navigate = useNavigate();
   const { addToast } = useToast();
 
   const todayStr = new Date().toISOString().split('T')[0];
+  const currentMonth = new Date().toISOString().slice(0, 7);
 
   // Match the logged in employee profile
   const employee = useMemo(() => {
     return employees.find((e) => e.userId === user?.id || e.id === user?.employeeId) || employees[0];
   }, [employees, user]);
+
+  const disbStatus = useMemo(() => {
+    if (!employee || !getDisbursementStatus) return { disbursed: false };
+    return getDisbursementStatus(employee.id, currentMonth, '1-15');
+  }, [employee, getDisbursementStatus, currentMonth]);
 
   const branch = branches.find((b) => b.id === employee?.branchId);
 
@@ -80,6 +86,39 @@ export const EmployeeDashboard = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
+      {/* High-Priority Payroll Notification Banner */}
+      <div className={`p-4 rounded-2xl text-white shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+        disbStatus?.disbursed
+          ? 'bg-gradient-to-r from-emerald-600 to-teal-700'
+          : 'bg-gradient-to-r from-blue-600 to-indigo-700'
+      }`}>
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-white/20 rounded-xl backdrop-blur-sm shrink-0">
+            <Banknote className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-white/20 tracking-wider">
+                {disbStatus?.disbursed ? '✅ Salary Paid' : '📢 Payroll Notification'}
+              </span>
+              <span className="text-xs opacity-80 font-mono">{currentMonth} Cutoff</span>
+            </div>
+            <p className="font-bold text-sm tracking-tight mt-0.5">
+              {disbStatus?.disbursed
+                ? 'Your semi-monthly salary has been officially disbursed & paid!'
+                : 'Your semi-monthly payslip statement is generated and ready for inspection.'}
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => navigate('/employee/payslips')}
+          className="px-4 py-2 bg-white text-slate-900 hover:bg-slate-100 rounded-xl text-xs font-extrabold shadow transition shrink-0 self-start sm:self-auto flex items-center gap-1.5"
+        >
+          <FileText className="w-3.5 h-3.5 text-blue-600" />
+          <span>Inspect Payslip Details →</span>
+        </button>
+      </div>
       {/* Employee Greeting & Live Punch Hero Card */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Welcome Profile Card */}
