@@ -204,7 +204,7 @@ export const DataProvider = ({ children }) => {
     };
   }, []);
 
-  // ── Direct Cloud Database Sync (Single Source of Truth Across Devices) ──
+  // ── Direct Cloud Database Sync (Bi-directional Sync & Multi-Device Alignment) ──
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
     const syncCloudData = async () => {
@@ -217,52 +217,76 @@ export const DataProvider = ({ children }) => {
           fetchDisbursementsFromSupabase(),
         ]);
 
-        // 1. Users — Direct Database Source of Truth
-        if (Array.isArray(cloudUsers) && cloudUsers.length > 0) {
-          setUsers(cloudUsers);
-          secureStorage.setItem(`${STORAGE_KEY_DATA}_users`, cloudUsers);
+        // 1. Users — Sync local unsynced users to cloud & align across devices
+        const localUsers = secureStorage.getItem(`${STORAGE_KEY_DATA}_users`) || INITIAL_USERS;
+        const userMap = new Map();
+        if (Array.isArray(cloudUsers)) {
+          cloudUsers.forEach((u) => { if (u && u.id) userMap.set(String(u.id), u); });
+        }
+        if (Array.isArray(localUsers)) {
+          localUsers.forEach((lUser) => {
+            if (lUser && lUser.id && !userMap.has(String(lUser.id))) {
+              userMap.set(String(lUser.id), lUser);
+              syncUserToSupabase(lUser).catch(() => {});
+            }
+          });
+        }
+        const alignedUsers = Array.from(userMap.values());
+        if (alignedUsers.length > 0) {
+          setUsers(alignedUsers);
+          secureStorage.setItem(`${STORAGE_KEY_DATA}_users`, alignedUsers);
         }
 
-        // 2. Employees — Direct Database Source of Truth with rich local metadata merge
-        if (Array.isArray(cloudEmployees) && cloudEmployees.length > 0) {
-          const localEmployees = secureStorage.getItem(`${STORAGE_KEY_DATA}_employees`) || [];
-          const localMap = new Map();
-          if (Array.isArray(localEmployees)) {
-            localEmployees.forEach((e) => { if (e && e.id) localMap.set(String(e.id), e); });
-          }
-          const alignedEmployees = cloudEmployees.map((cEmp) => {
-            const existing = localMap.get(String(cEmp.id)) || {};
-            return {
-              ...existing,
-              ...cEmp,
-              uid: existing.uid || cEmp.uid || `EMP_UID_${cEmp.id}`,
-              employmentType: existing.employmentType || cEmp.employmentType || 'Regular Full-Time',
-              tin: existing.tin || cEmp.tin || '',
-              sss: existing.sss || cEmp.sss || '',
-              philhealth: existing.philhealth || cEmp.philhealth || '',
-              pagibig: existing.pagibig || cEmp.pagibig || '',
-              bankAccount: existing.bankAccount || cEmp.bankAccount || '',
-              idVerificationStatus: existing.idVerificationStatus || cEmp.idVerificationStatus || 'Verified',
-              idType: existing.idType || cEmp.idType || 'Government ID / PhilID',
-            };
+        // 2. Employees — Sync local unsynced employees to cloud & align across devices
+        const localEmployees = secureStorage.getItem(`${STORAGE_KEY_DATA}_employees`) || INITIAL_EMPLOYEES;
+        const empMap = new Map();
+        if (Array.isArray(cloudEmployees)) {
+          cloudEmployees.forEach((e) => { if (e && e.id) empMap.set(String(e.id), e); });
+        }
+        if (Array.isArray(localEmployees)) {
+          localEmployees.forEach((lEmp) => {
+            if (lEmp && lEmp.id) {
+              if (!empMap.has(String(lEmp.id))) {
+                empMap.set(String(lEmp.id), lEmp);
+                syncEmployeeToSupabase(lEmp).catch(() => {});
+              } else {
+                const cloudVer = empMap.get(String(lEmp.id));
+                empMap.set(String(lEmp.id), {
+                  ...lEmp,
+                  ...cloudVer,
+                  uid: lEmp.uid || cloudVer.uid || `EMP_UID_${cloudVer.id}`,
+                  employmentType: lEmp.employmentType || cloudVer.employmentType || 'Regular Full-Time',
+                  tin: lEmp.tin || cloudVer.tin || '',
+                  sss: lEmp.sss || cloudVer.sss || '',
+                  philhealth: lEmp.philhealth || cloudVer.philhealth || '',
+                  pagibig: lEmp.pagibig || cloudVer.pagibig || '',
+                  bankAccount: lEmp.bankAccount || cloudVer.bankAccount || '',
+                  idVerificationStatus: lEmp.idVerificationStatus || cloudVer.idVerificationStatus || 'Verified',
+                  idType: lEmp.idType || cloudVer.idType || 'Government ID / PhilID',
+                });
+              }
+            }
           });
+        }
+        const alignedEmployees = Array.from(empMap.values());
+        if (alignedEmployees.length > 0) {
           setEmployees(alignedEmployees);
           secureStorage.setItem(`${STORAGE_KEY_DATA}_employees`, alignedEmployees);
         }
 
-        // 3. Branches — Direct Database Source of Truth
+        // 3. Branches — Direct Database Alignment
         if (Array.isArray(cloudBranches) && cloudBranches.length > 0) {
           setBranches(cloudBranches);
           secureStorage.setItem(`${STORAGE_KEY_DATA}_branches`, cloudBranches);
         }
 
-        // 4. Attendance Logs — Direct Database Source of Truth
+        // 4. Attendance Logs — Direct Database Alignment
         if (Array.isArray(cloudAttendance)) {
           setAttendanceLogs(cloudAttendance);
           secureStorage.setItem(`${STORAGE_KEY_DATA}_attendance`, cloudAttendance);
         }
 
-        // 5. Disbursements — Direct Database Source of Truth
+        // 5. Disbursements — Direct Database Alignment
         if (cloudDisbursements && typeof cloudDisbursements === 'object') {
           setDisbursements(cloudDisbursements);
           secureStorage.setItem(`${STORAGE_KEY_DATA}_disbursements`, cloudDisbursements);
