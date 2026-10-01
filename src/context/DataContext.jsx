@@ -200,10 +200,10 @@ export const DataProvider = ({ children }) => {
     };
   }, []);
 
-  // ── Initial Cloud Sync & Bidirectional Merge (Cross-Device Database Sync) ──
+  // ── Continuous 5-Second Cloud Sync & Bidirectional Merge (Cross-Device Database Sync) ──
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
-    const syncCloudDataOnMount = async () => {
+    const syncCloudData = async () => {
       try {
         const [cloudUsers, cloudEmployees, cloudBranches, cloudAttendance, cloudDisbursements] = await Promise.all([
           fetchUsersFromSupabase(),
@@ -267,11 +267,16 @@ export const DataProvider = ({ children }) => {
           secureStorage.setItem(`${STORAGE_KEY_DATA}_disbursements`, cloudDisbursements);
         }
       } catch (err) {
-        console.warn('[Supabase Sync] Mount sync error:', err);
+        console.warn('[Supabase Sync] Background sync error:', err);
       }
     };
 
-    syncCloudDataOnMount();
+    // Run immediately
+    syncCloudData();
+
+    // Continuous 5-second sync polling for cross-device & Messenger browser compatibility
+    const interval = setInterval(syncCloudData, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   // Reset database back to clean seed
