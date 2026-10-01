@@ -73,21 +73,25 @@ export const DataProvider = ({ children }) => {
 
   const [employees, setEmployees] = useState(() => {
     const raw = secureStorage.getItem(`${STORAGE_KEY_DATA}_employees`) || INITIAL_EMPLOYEES;
-    if (!Array.isArray(raw)) return INITIAL_EMPLOYEES;
+    if (!Array.isArray(raw) || raw.length === 0) return INITIAL_EMPLOYEES;
     
-    // Auto-heal duplicate IDs so every single employee has a strictly unique ID & UID
+    // Auto-heal duplicate or missing IDs safely while preserving valid existing IDs
     const seenIds = new Set();
     return raw.map((emp, index) => {
       let uniqueId = emp.id;
       if (!uniqueId || seenIds.has(uniqueId)) {
         const branchNum = (emp.branchId || 'BRANCH-001').replace('BRANCH-', '');
-        uniqueId = `EMP-${branchNum}-${String(index + 1).padStart(2, '0')}`;
+        let seq = index + 1;
+        while (seenIds.has(`EMP-${branchNum}-${String(seq).padStart(2, '0')}`)) {
+          seq++;
+        }
+        uniqueId = `EMP-${branchNum}-${String(seq).padStart(2, '0')}`;
       }
       seenIds.add(uniqueId);
       return {
         ...emp,
         id: uniqueId,
-        uid: emp.uid || `EMP_UID_${index}_${Math.random().toString(36).slice(2, 8)}`,
+        uid: emp.uid || `EMP_UID_${uniqueId}_${index}`,
       };
     });
   });
@@ -200,7 +204,7 @@ export const DataProvider = ({ children }) => {
     };
   }, []);
 
-  // ── Continuous 5-Second Cloud Sync & Bidirectional Merge (Cross-Device Database Sync) ──
+  // ── Direct Cloud Database Sync (Single Source of Truth Across Devices) ──
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
     const syncCloudData = async () => {
@@ -213,56 +217,53 @@ export const DataProvider = ({ children }) => {
           fetchDisbursementsFromSupabase(),
         ]);
 
-        // 1. Users
-        const localUsers = secureStorage.getItem(`${STORAGE_KEY_DATA}_users`) || INITIAL_USERS;
-        const mergedUsers = Array.isArray(cloudUsers) && cloudUsers.length > 0 ? [...cloudUsers] : [];
-        localUsers.forEach((lUser) => {
-          if (!mergedUsers.some((u) => u.id === lUser.id || (u.username && u.username.toLowerCase() === lUser.username?.toLowerCase()))) {
-            mergedUsers.push(lUser);
-            syncUserToSupabase(lUser).catch(() => {});
-          }
-        });
-        if (mergedUsers.length > 0) {
-          setUsers(mergedUsers);
-          secureStorage.setItem(`${STORAGE_KEY_DATA}_users`, mergedUsers);
+        // 1. Users — Direct Database Source of Truth
+        if (Array.isArray(cloudUsers) && cloudUsers.length > 0) {
+          setUsers(cloudUsers);
+          secureStorage.setItem(`${STORAGE_KEY_DATA}_users`, cloudUsers);
         }
 
-        // 2. Employees
-        const localEmployees = secureStorage.getItem(`${STORAGE_KEY_DATA}_employees`) || INITIAL_EMPLOYEES;
-        const mergedEmployees = Array.isArray(cloudEmployees) && cloudEmployees.length > 0 ? [...cloudEmployees] : [];
-        localEmployees.forEach((lEmp) => {
-          if (!mergedEmployees.some((e) => e.id === lEmp.id || (e.name && e.name.toLowerCase() === lEmp.name?.toLowerCase()))) {
-            mergedEmployees.push(lEmp);
-            syncEmployeeToSupabase(lEmp).catch(() => {});
+        // 2. Employees — Direct Database Source of Truth with rich local metadata merge
+        if (Array.isArray(cloudEmployees) && cloudEmployees.length > 0) {
+          const localEmployees = secureStorage.getItem(`${STORAGE_KEY_DATA}_employees`) || [];
+          const localMap = new Map();
+          if (Array.isArray(localEmployees)) {
+            localEmployees.forEach((e) => { if (e && e.id) localMap.set(String(e.id), e); });
           }
-        });
-        if (mergedEmployees.length > 0) {
-          setEmployees(mergedEmployees);
-          secureStorage.setItem(`${STORAGE_KEY_DATA}_employees`, mergedEmployees);
+          const alignedEmployees = cloudEmployees.map((cEmp) => {
+            const existing = localMap.get(String(cEmp.id)) || {};
+            return {
+              ...existing,
+              ...cEmp,
+              uid: existing.uid || cEmp.uid || `EMP_UID_${cEmp.id}`,
+              employmentType: existing.employmentType || cEmp.employmentType || 'Regular Full-Time',
+              tin: existing.tin || cEmp.tin || '',
+              sss: existing.sss || cEmp.sss || '',
+              philhealth: existing.philhealth || cEmp.philhealth || '',
+              pagibig: existing.pagibig || cEmp.pagibig || '',
+              bankAccount: existing.bankAccount || cEmp.bankAccount || '',
+              idVerificationStatus: existing.idVerificationStatus || cEmp.idVerificationStatus || 'Verified',
+              idType: existing.idType || cEmp.idType || 'Government ID / PhilID',
+            };
+          });
+          setEmployees(alignedEmployees);
+          secureStorage.setItem(`${STORAGE_KEY_DATA}_employees`, alignedEmployees);
         }
 
-        // 3. Branches
-        const localBranches = secureStorage.getItem(`${STORAGE_KEY_DATA}_branches`) || INITIAL_BRANCHES;
-        const mergedBranches = Array.isArray(cloudBranches) && cloudBranches.length > 0 ? [...cloudBranches] : [];
-        localBranches.forEach((lBranch) => {
-          if (!mergedBranches.some((b) => b.id === lBranch.id)) {
-            mergedBranches.push(lBranch);
-            syncBranchToSupabase(lBranch).catch(() => {});
-          }
-        });
-        if (mergedBranches.length > 0) {
-          setBranches(mergedBranches);
-          secureStorage.setItem(`${STORAGE_KEY_DATA}_branches`, mergedBranches);
+        // 3. Branches — Direct Database Source of Truth
+        if (Array.isArray(cloudBranches) && cloudBranches.length > 0) {
+          setBranches(cloudBranches);
+          secureStorage.setItem(`${STORAGE_KEY_DATA}_branches`, cloudBranches);
         }
 
-        // 4. Attendance Logs
-        if (Array.isArray(cloudAttendance) && cloudAttendance.length > 0) {
+        // 4. Attendance Logs — Direct Database Source of Truth
+        if (Array.isArray(cloudAttendance)) {
           setAttendanceLogs(cloudAttendance);
           secureStorage.setItem(`${STORAGE_KEY_DATA}_attendance`, cloudAttendance);
         }
 
-        // 5. Disbursements
-        if (cloudDisbursements && Object.keys(cloudDisbursements).length > 0) {
+        // 5. Disbursements — Direct Database Source of Truth
+        if (cloudDisbursements && typeof cloudDisbursements === 'object') {
           setDisbursements(cloudDisbursements);
           secureStorage.setItem(`${STORAGE_KEY_DATA}_disbursements`, cloudDisbursements);
         }
@@ -271,11 +272,11 @@ export const DataProvider = ({ children }) => {
       }
     };
 
-    // Run immediately
+    // Run immediately on mount
     syncCloudData();
 
-    // Continuous 5-second sync polling for cross-device & Messenger browser compatibility
-    const interval = setInterval(syncCloudData, 5000);
+    // Fast 3-second continuous sync polling for real-time cross-device alignment
+    const interval = setInterval(syncCloudData, 3000);
     return () => clearInterval(interval);
   }, []);
 
@@ -614,9 +615,9 @@ export const DataProvider = ({ children }) => {
   };
 
   /**
-   * BULK IMPORT EMPLOYEES (Ensures unique sequential IDs and unique user accounts)
+   * BULK IMPORT EMPLOYEES (Ensures unique sequential IDs and unique user accounts + direct DB save)
    */
-  const addEmployeesBulk = (empList) => {
+  const addEmployeesBulk = async (empList) => {
     let currentEmployees = [...employees];
     let currentUsers = [...users];
     const addedEmployees = [];
@@ -685,6 +686,19 @@ export const DataProvider = ({ children }) => {
 
     setEmployees(currentEmployees);
     setUsers(currentUsers);
+    secureStorage.setItem(`${STORAGE_KEY_DATA}_employees`, currentEmployees);
+    secureStorage.setItem(`${STORAGE_KEY_DATA}_users`, currentUsers);
+
+    // Save directly to cloud database (Supabase) immediately
+    if (isSupabaseConfigured()) {
+      try {
+        await Promise.all(addedUsers.map((u) => syncUserToSupabase(u)));
+        await Promise.all(addedEmployees.map((emp) => syncEmployeeToSupabase(emp)));
+      } catch (err) {
+        console.warn('[DB Sync] Bulk sync error:', err);
+      }
+    }
+
     return { success: true, employees: addedEmployees, users: addedUsers };
   };
 

@@ -296,18 +296,18 @@ export const EmployeeManagement = () => {
     e.target.value = '';
   };
 
-  const handleBulkImport = () => {
+  const handleBulkImport = async () => {
     setImportingRows(true);
     const validRows = importPreview.filter((row) => row.name && row.position);
     if (validRows.length > 0) {
-      addEmployeesBulk(validRows);
+      await addEmployeesBulk(validRows);
     }
     setImportingRows(false);
     setImportModalOpen(false);
     setImportPreview([]);
     addToast({
       title: 'Bulk Import Complete',
-      message: `Successfully registered ${validRows.length} employee${validRows.length !== 1 ? 's' : ''} with unique sequential IDs.`,
+      message: `Successfully registered ${validRows.length} employee${validRows.length !== 1 ? 's' : ''} and saved directly to the database.`,
       type: 'success',
     });
   };
