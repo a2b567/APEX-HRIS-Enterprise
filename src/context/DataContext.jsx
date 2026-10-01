@@ -10,6 +10,12 @@ import { calculateTimeEntry } from '../utils/dtrCalculator';
 import { parseQRPayload, createEmployeeQRToken } from '../utils/qrUtils';
 import { soundFeedback } from '../utils/audioFeedback';
 import { secureStorage } from '../utils/securityUtils';
+import {
+  deleteUserFromSupabase,
+  deleteEmployeeFromSupabase,
+  deleteBranchFromSupabase,
+  isSupabaseConfigured,
+} from '../services/supabaseClient';
 
 export const DataContext = createContext(null);
 
@@ -48,15 +54,8 @@ export const DataProvider = ({ children }) => {
 
   const [users, setUsers] = useState(() => {
     const saved = secureStorage.getItem(`${STORAGE_KEY_DATA}_users`);
-    if (saved && Array.isArray(saved) && saved.length > 0) {
-      // Merge initial users so Aron, Marco, and Admin are always preserved
-      const merged = [...saved];
-      INITIAL_USERS.forEach((initU) => {
-        if (!merged.some((u) => u.id === initU.id || u.username.toLowerCase() === initU.username.toLowerCase())) {
-          merged.push(initU);
-        }
-      });
-      return merged;
+    if (saved && Array.isArray(saved)) {
+      return saved;
     }
     return INITIAL_USERS;
   });
@@ -282,6 +281,10 @@ export const DataProvider = ({ children }) => {
       prev.map((b) => (b.supervisorId === Number(id) ? { ...b, supervisorId: null } : b))
     );
 
+    if (isSupabaseConfigured()) {
+      deleteUserFromSupabase(Number(id)).catch(() => {});
+    }
+
     return { success: true };
   };
 
@@ -323,6 +326,10 @@ export const DataProvider = ({ children }) => {
     setUsers((prev) =>
       prev.map((u) => (u.branchId === branchId ? { ...u, branchId: null } : u))
     );
+
+    if (isSupabaseConfigured()) {
+      deleteBranchFromSupabase(branchId).catch(() => {});
+    }
     return { success: true };
   };
 
@@ -533,6 +540,7 @@ export const DataProvider = ({ children }) => {
    */
   const deleteEmployee = (target) => {
     let deletedId = null;
+    let deletedUserId = null;
 
     setEmployees((prev) => {
       let indexToRemove = -1;
@@ -558,6 +566,7 @@ export const DataProvider = ({ children }) => {
       if (indexToRemove === -1) return prev;
 
       deletedId = prev[indexToRemove].id;
+      deletedUserId = prev[indexToRemove].userId;
       const clone = [...prev];
       clone.splice(indexToRemove, 1); // Strictly remove exactly 1 single employee item!
       return clone;
@@ -565,6 +574,13 @@ export const DataProvider = ({ children }) => {
 
     if (deletedId) {
       setAttendanceLogs((prev) => prev.filter((l) => l.employeeId !== deletedId));
+      if (deletedUserId) {
+        setUsers((prev) => prev.filter((u) => u.id !== deletedUserId && u.employeeId !== deletedId));
+      }
+      if (isSupabaseConfigured()) {
+        deleteEmployeeFromSupabase(deletedId).catch(() => {});
+        if (deletedUserId) deleteUserFromSupabase(deletedUserId).catch(() => {});
+      }
     }
     return { success: true };
   };

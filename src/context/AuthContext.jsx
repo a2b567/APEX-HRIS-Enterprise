@@ -84,9 +84,28 @@ export const AuthProvider = ({ children }) => {
     }
 
     // 2. Fetch from Supabase (cloud) + local fallback
-    let allUsers = [...INITIAL_USERS];
+    let allUsers = [];
     try {
-      // Try Supabase first for cross-device sync
+      const saved =
+        secureStorage.getItem('dtr_payroll_database_v8_redmart_users') ||
+        secureStorage.getItem('dtr_payroll_database_v6_5sup_users') ||
+        localStorage.getItem('dtr_payroll_database_v8_redmart_users');
+      if (saved) {
+        const parsed = Array.isArray(saved) ? saved : JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          allUsers = parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('Error reading stored users:', e);
+    }
+
+    if (allUsers.length === 0) {
+      allUsers = [...INITIAL_USERS];
+    }
+
+    try {
+      // Try Supabase sync if configured
       if (isSupabaseConfigured()) {
         const cloudUsers = await fetchUsersFromSupabase();
         if (cloudUsers && cloudUsers.length > 0) {
@@ -99,24 +118,6 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (cloudErr) {
       console.warn('[Supabase] Could not fetch cloud users, using local:', cloudErr);
-    }
-    try {
-      const saved =
-        secureStorage.getItem('dtr_payroll_database_v8_redmart_users') ||
-        secureStorage.getItem('dtr_payroll_database_v6_5sup_users') ||
-        localStorage.getItem('dtr_payroll_database_v8_redmart_users');
-      if (saved) {
-        const parsed = Array.isArray(saved) ? saved : JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          parsed.forEach((storedU) => {
-            if (!allUsers.some((u) => u.id === storedU.id || (u.username && u.username.toLowerCase() === storedU.username?.toLowerCase()))) {
-              allUsers.push(storedU);
-            }
-          });
-        }
-      }
-    } catch (e) {
-      console.warn('Error reading stored users:', e);
     }
 
     const q = username.trim().toLowerCase();

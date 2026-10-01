@@ -202,4 +202,34 @@ export const logAttendanceToSupabase = async (log) => {
   }
 };
 
+export const deleteUserFromSupabase = async (userId) => {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const { error } = await supabase.from('users').delete().eq('id', userId);
+    if (error) console.warn('[Supabase] deleteUserFromSupabase error:', error.message);
+  } catch (err) {
+    console.warn('[Supabase] deleteUserFromSupabase exception:', err);
+  }
+};
+
+export const deleteEmployeeFromSupabase = async (empId) => {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const { error } = await supabase.from('employees').delete().eq('id', empId);
+    if (error) console.warn('[Supabase] deleteEmployeeFromSupabase error:', error.message);
+  } catch (err) {
+    console.warn('[Supabase] deleteEmployeeFromSupabase exception:', err);
+  }
+};
+
+export const deleteBranchFromSupabase = async (branchId) => {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const { error } = await supabase.from('branches').delete().eq('id', branchId);
+    if (error) console.warn('[Supabase] deleteBranchFromSupabase error:', error.message);
+  } catch (err) {
+    console.warn('[Supabase] deleteBranchFromSupabase exception:', err);
+  }
+};
+
 export default supabase;
