@@ -25,6 +25,7 @@ import {
   syncBranchToSupabase,
   logAttendanceToSupabase,
   syncDisbursementToSupabase,
+  subscribeToTableChanges,
   supabase,
 } from '../services/supabaseClient';
 
@@ -204,9 +205,10 @@ export const DataProvider = ({ children }) => {
     };
   }, []);
 
-  // ── Direct Cloud Database Sync (Bi-directional Sync & Multi-Device Alignment) ──
+  // ── Cloud Sync: Realtime + Polling Fallback (Multi-Device Alignment) ──
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
+
     const syncCloudData = async () => {
       try {
         const [cloudUsers, cloudEmployees, cloudBranches, cloudAttendance, cloudDisbursements] = await Promise.all([
@@ -217,76 +219,91 @@ export const DataProvider = ({ children }) => {
           fetchDisbursementsFromSupabase(),
         ]);
 
-        // 1. Users — Sync local unsynced users to cloud & align across devices
+        // 1. Users — push local-only users to cloud, then align state from cloud master
         const localUsers = secureStorage.getItem(`${STORAGE_KEY_DATA}_users`) || INITIAL_USERS;
-        const userMap = new Map();
-        if (Array.isArray(cloudUsers)) {
-          cloudUsers.forEach((u) => { if (u && u.id) userMap.set(String(u.id), u); });
-        }
+        const cloudUserIds = new Set((cloudUsers || []).map((u) => String(u.id)));
+        const cloudUsernames = new Set((cloudUsers || []).map((u) => u.username));
         if (Array.isArray(localUsers)) {
-          localUsers.forEach((lUser) => {
-            if (lUser && lUser.id && !userMap.has(String(lUser.id))) {
-              userMap.set(String(lUser.id), lUser);
+          for (const lUser of localUsers) {
+            if (!lUser || !lUser.id) continue;
+            // Push to cloud if neither ID nor username exists there
+            if (!cloudUserIds.has(String(lUser.id)) && !cloudUsernames.has(lUser.username)) {
               syncUserToSupabase(lUser).catch(() => {});
             }
-          });
+          }
         }
+        // Cloud is authoritative — merge any extra local fields not stored in cloud
+        const userMap = new Map();
+        (cloudUsers || []).forEach((u) => { if (u && u.id) userMap.set(String(u.id), u); });
+        (localUsers || []).forEach((lUser) => {
+          if (!lUser || !lUser.id) return;
+          const existing = userMap.get(String(lUser.id));
+          if (existing) {
+            // Enrich cloud record with any extra local-only fields (e.g. UI metadata)
+            userMap.set(String(lUser.id), { ...lUser, ...existing });
+          }
+        });
         const alignedUsers = Array.from(userMap.values());
         if (alignedUsers.length > 0) {
           setUsers(alignedUsers);
           secureStorage.setItem(`${STORAGE_KEY_DATA}_users`, alignedUsers);
         }
 
-        // 2. Employees — Sync local unsynced employees to cloud & align across devices
+        // 2. Employees — push ALL local employees missing from cloud (by ID OR name)
         const localEmployees = secureStorage.getItem(`${STORAGE_KEY_DATA}_employees`) || INITIAL_EMPLOYEES;
-        const empMap = new Map();
-        if (Array.isArray(cloudEmployees)) {
-          cloudEmployees.forEach((e) => { if (e && e.id) empMap.set(String(e.id), e); });
-        }
+        const cloudEmpIds = new Set((cloudEmployees || []).map((e) => String(e.id)));
+        const cloudEmpNames = new Set((cloudEmployees || []).map((e) => (e.name || '').toLowerCase().trim()));
         if (Array.isArray(localEmployees)) {
-          localEmployees.forEach((lEmp) => {
-            if (lEmp && lEmp.id) {
-              if (!empMap.has(String(lEmp.id))) {
-                empMap.set(String(lEmp.id), lEmp);
-                syncEmployeeToSupabase(lEmp).catch(() => {});
-              } else {
-                const cloudVer = empMap.get(String(lEmp.id));
-                empMap.set(String(lEmp.id), {
-                  ...lEmp,
-                  ...cloudVer,
-                  uid: lEmp.uid || cloudVer.uid || `EMP_UID_${cloudVer.id}`,
-                  employmentType: lEmp.employmentType || cloudVer.employmentType || 'Regular Full-Time',
-                  tin: lEmp.tin || cloudVer.tin || '',
-                  sss: lEmp.sss || cloudVer.sss || '',
-                  philhealth: lEmp.philhealth || cloudVer.philhealth || '',
-                  pagibig: lEmp.pagibig || cloudVer.pagibig || '',
-                  bankAccount: lEmp.bankAccount || cloudVer.bankAccount || '',
-                  idVerificationStatus: lEmp.idVerificationStatus || cloudVer.idVerificationStatus || 'Verified',
-                  idType: lEmp.idType || cloudVer.idType || 'Government ID / PhilID',
-                });
-              }
+          for (const lEmp of localEmployees) {
+            if (!lEmp || !lEmp.id) continue;
+            const nameKey = (lEmp.name || '').toLowerCase().trim();
+            // Push to cloud if this employee doesn't exist by ID or by full name
+            if (!cloudEmpIds.has(String(lEmp.id)) || !cloudEmpNames.has(nameKey)) {
+              syncEmployeeToSupabase(lEmp).catch(() => {});
             }
-          });
+          }
         }
+        // Cloud is authoritative — merge extra local-only fields
+        const empMap = new Map();
+        (cloudEmployees || []).forEach((e) => { if (e && e.id) empMap.set(String(e.id), e); });
+        (localEmployees || []).forEach((lEmp) => {
+          if (!lEmp || !lEmp.id) return;
+          const existing = empMap.get(String(lEmp.id));
+          if (existing) {
+            empMap.set(String(lEmp.id), {
+              ...lEmp,
+              ...existing,
+              uid: lEmp.uid || existing.uid || `EMP_UID_${existing.id}`,
+              employmentType: existing.employmentType || lEmp.employmentType || 'Regular Full-Time',
+              tin: existing.tin || lEmp.tin || '',
+              sss: existing.sss || lEmp.sss || '',
+              philhealth: existing.philhealth || lEmp.philhealth || '',
+              pagibig: existing.pagibig || lEmp.pagibig || '',
+              bankAccount: existing.bankAccount || lEmp.bankAccount || '',
+              idVerificationStatus: existing.idVerificationStatus || lEmp.idVerificationStatus || 'Verified',
+              idType: existing.idType || lEmp.idType || 'Government ID / PhilID',
+            });
+          }
+        });
         const alignedEmployees = Array.from(empMap.values());
         if (alignedEmployees.length > 0) {
           setEmployees(alignedEmployees);
           secureStorage.setItem(`${STORAGE_KEY_DATA}_employees`, alignedEmployees);
         }
 
-        // 3. Branches — Direct Database Alignment
+        // 3. Branches — Cloud is authoritative
         if (Array.isArray(cloudBranches) && cloudBranches.length > 0) {
           setBranches(cloudBranches);
           secureStorage.setItem(`${STORAGE_KEY_DATA}_branches`, cloudBranches);
         }
 
-        // 4. Attendance Logs — Direct Database Alignment
+        // 4. Attendance Logs — Cloud is authoritative
         if (Array.isArray(cloudAttendance)) {
           setAttendanceLogs(cloudAttendance);
           secureStorage.setItem(`${STORAGE_KEY_DATA}_attendance`, cloudAttendance);
         }
 
-        // 5. Disbursements — Direct Database Alignment
+        // 5. Disbursements — Cloud is authoritative
         if (cloudDisbursements && typeof cloudDisbursements === 'object') {
           setDisbursements(cloudDisbursements);
           secureStorage.setItem(`${STORAGE_KEY_DATA}_disbursements`, cloudDisbursements);
@@ -296,12 +313,22 @@ export const DataProvider = ({ children }) => {
       }
     };
 
-    // Run immediately on mount
+    // ── Run immediately on mount
     syncCloudData();
 
-    // Fast 3-second continuous sync polling for real-time cross-device alignment
-    const interval = setInterval(syncCloudData, 3000);
-    return () => clearInterval(interval);
+    // ── Supabase Realtime: instant push notifications when any device changes data
+    const realtimeTables = ['employees', 'users', 'branches', 'attendance_logs', 'disbursements'];
+    const channels = realtimeTables.map((table) =>
+      subscribeToTableChanges(table, syncCloudData)
+    );
+
+    // ── Polling fallback every 10 seconds (catches missed Realtime events)
+    const interval = setInterval(syncCloudData, 10000);
+
+    return () => {
+      clearInterval(interval);
+      channels.forEach((ch) => { if (ch) ch.unsubscribe(); });
+    };
   }, []);
 
   // Reset database back to clean seed

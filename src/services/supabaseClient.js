@@ -351,4 +351,26 @@ export const fetchDisbursementsFromSupabase = async () => {
   }
 };
 
+/**
+ * Subscribe to Supabase Realtime changes on a given table.
+ * Returns the channel so the caller can unsubscribe on cleanup.
+ *
+ * @param {string} table  - table name e.g. 'employees'
+ * @param {Function} callback - called with () when any change arrives
+ * @returns {RealtimeChannel}
+ */
+export const subscribeToTableChanges = (table, callback) => {
+  if (!isSupabaseConfigured()) return null;
+  const channel = supabase
+    .channel(`realtime_${table}_${Date.now()}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table },
+      () => { callback(); }
+    )
+    .subscribe();
+  return channel;
+};
+
 export default supabase;
+
