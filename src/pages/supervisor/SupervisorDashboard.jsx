@@ -34,7 +34,10 @@ export const SupervisorDashboard = () => {
   const [selectedEmpId, setSelectedEmpId] = useState('');
   const [punchType, setPunchType] = useState('IN');
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  })();
 
   // NOTE: This is UI-level guard only. Go Fiber backend MUST enforce branch_id isolation.
   const myBranch = branches.find((b) => b.id === user?.branchId);

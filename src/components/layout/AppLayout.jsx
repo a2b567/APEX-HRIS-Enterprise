@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Navbar from './Navbar';
@@ -23,9 +23,9 @@ export const AppLayout = () => {
         {/* Global Footer & Developer Watermark */}
         <footer className="border-t border-slate-200/80 bg-white px-4 py-3 text-center sm:text-left sm:px-8 text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-2 mt-auto">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-700">REDMART Enterprise</span>
+            <span className="font-semibold text-slate-700">REDDMART Enterprise</span>
             <span className="text-slate-300">•</span>
-            <span>© 2026 REDMART Enterprise</span>
+            <span>© 2026 REDDMART Enterprise</span>
           </div>
 
           <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-[11px] font-mono font-bold text-slate-700 shadow-2xs">

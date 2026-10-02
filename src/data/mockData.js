@@ -1,4 +1,4 @@
-/**
+﻿/**
  * APEX HRIS Enterprise — Clean System Seed
  * No demo data. All collections start empty.
  * Only the Super Admin account is pre-seeded for initial login.
@@ -12,57 +12,13 @@ export const INITIAL_BRANCHES = [
     location: 'Corporate Center, Ayala Ave, Makati City',
     contactNumber: '+63 (02) 8888-0101',
     email: 'makati.hq@apexhris.enterprise',
-    supervisorId: 101,
+    supervisorId: null,
     status: 'Active',
     establishedDate: '2026-01-01',
   },
-  {
-    id: 'BRANCH-002',
-    code: 'B002',
-    name: 'BGC Innovation Hub',
-    location: 'High Street South, Bonifacio Global City, Taguig',
-    contactNumber: '+63 (02) 8888-0102',
-    email: 'bgc.hub@apexhris.enterprise',
-    supervisorId: 102,
-    status: 'Active',
-    establishedDate: '2026-01-05',
-  },
-  {
-    id: 'BRANCH-003',
-    code: 'B003',
-    name: 'Cebu IT Park Regional Hub',
-    location: 'Asia Town IT Park, Lahug, Cebu City',
-    contactNumber: '+63 (32) 412-8803',
-    email: 'cebu.hub@apexhris.enterprise',
-    supervisorId: 103,
-    status: 'Active',
-    establishedDate: '2026-01-10',
-  },
-  {
-    id: 'BRANCH-004',
-    code: 'B004',
-    name: 'Davao Regional Center',
-    location: 'Abreeza Corporate Center, Bajada, Davao City',
-    contactNumber: '+63 (82) 298-8804',
-    email: 'davao.hub@apexhris.enterprise',
-    supervisorId: 104,
-    status: 'Active',
-    establishedDate: '2026-01-15',
-  },
-  {
-    id: 'BRANCH-005',
-    code: 'B005',
-    name: 'Ortigas Commercial Center',
-    location: 'ADB Avenue, Ortigas Center, Pasig City',
-    contactNumber: '+63 (02) 8888-0105',
-    email: 'ortigas.hub@apexhris.enterprise',
-    supervisorId: 105,
-    status: 'Active',
-    establishedDate: '2026-01-20',
-  },
 ];
 
-// Seeded Super Admin, 5 Supervisors, and 1 Test Employee Account
+// Seeded Super Admin only
 export const INITIAL_USERS = [
   {
     id: 1,
@@ -76,118 +32,20 @@ export const INITIAL_USERS = [
     status: 'Active',
     branchId: null, // Global access — no branch restriction
   },
-  {
-    id: 101,
-    role: 'SUPERVISOR',
-    username: 'aron',
-    password: 'hashed_Supervisor@123',
-    name: 'Aron Chester M. Sangcap',
-    email: 'aron.sangcap@redmart.enterprise',
-    position: 'Branch Operations Supervisor',
-    branchId: 'BRANCH-001',
-    phone: '+63 917 111 2233',
-    avatar: '',
-    status: 'Active',
-  },
-  {
-    id: 102,
-    role: 'SUPERVISOR',
-    username: 'marco',
-    password: 'hashed_Supervisor@123',
-    name: 'Marco F. Baluncio',
-    email: 'marco@gmail.com',
-    position: 'Branch Operations Supervisor',
-    branchId: 'BRANCH-002',
-    phone: '09123456789',
-    avatar: '',
-    status: 'Active',
-  },
-  {
-    id: 103,
-    role: 'SUPERVISOR',
-    username: 'sup.cebu',
-    password: 'hashed_Supervisor@123',
-    name: 'Elena Villanueva',
-    email: 'elena.villanueva@apexhris.enterprise',
-    position: 'Branch Operations Supervisor',
-    branchId: 'BRANCH-003',
-    phone: '+63 917 333 4455',
-    avatar: '',
-    status: 'Active',
-  },
-  {
-    id: 104,
-    role: 'SUPERVISOR',
-    username: 'sup.davao',
-    password: 'hashed_Supervisor@123',
-    name: 'Mark Torres',
-    email: 'mark.torres@apexhris.enterprise',
-    position: 'Branch Operations Supervisor',
-    branchId: 'BRANCH-004',
-    phone: '+63 917 444 5566',
-    avatar: '',
-    status: 'Active',
-  },
-  {
-    id: 105,
-    role: 'SUPERVISOR',
-    username: 'sup.ortigas',
-    password: 'hashed_Supervisor@123',
-    name: 'Patricia Lim',
-    email: 'patricia.lim@apexhris.enterprise',
-    position: 'Branch Operations Supervisor',
-    branchId: 'BRANCH-005',
-    phone: '+63 917 555 6677',
-    avatar: '',
-    status: 'Active',
-  },
-  {
-    id: 2,
-    role: 'EMPLOYEE',
-    username: 'juan.cruz',
-    password: 'hashed_EMP-001-01',
-    name: 'Juan Cruz',
-    email: 'juan.cruz@apexhris.enterprise',
-    position: 'Software Engineer',
-    employeeId: 'EMP-001-01',
-    branchId: 'BRANCH-001',
-    avatar: '',
-    status: 'Active',
-    phone: '+63 917 123 4567',
-  },
 ];
 
-// 1 Seeded Employee Record for testing
-export const INITIAL_EMPLOYEES = [
-  {
-    id: 'EMP-001-01',
-    userId: 2,
-    name: 'Juan Cruz',
-    email: 'juan.cruz@apexhris.enterprise',
-    position: 'Software Engineer',
-    department: 'Technology',
-    branchId: 'BRANCH-001',
-    dailyRate: 1000,
-    hourlyRate: 125,
-    status: 'Active',
-    hireDate: '2026-01-15',
-    qrToken: 'APEX-EMP-001-01-BRANCH-001-SECURE',
-    qrIssuedAt: '2026-01-15',
-    qrStatus: 'active',
-    idType: 'Government ID / PhilID',
-    idVerificationStatus: 'Verified',
-    idVerifiedAt: '2026-01-15',
-    idVerifiedBy: 'System Administrator',
-  },
-];
+
+// No employees pre-seeded — all employees must be added manually or via CSV import
+export const INITIAL_EMPLOYEES = [];
+
 
 // No attendance logs pre-seeded
 export const generateInitialAttendanceLogs = () => [];
 
 // Standard Company Policy & Payroll Settings
 export const INITIAL_SETTINGS = {
-  companyName: 'REDMART Enterprise',
-  systemTitle: 'REDMART Enterprise',
+  companyName: 'REDDMART Enterprise',
+  systemTitle: 'REDDMART Enterprise',
   companyTagline: 'Enterprise Multi-Branch HRIS & Payroll Platform',
   taxIdNumber: '',
   standardWorkHoursPerDay: 8,

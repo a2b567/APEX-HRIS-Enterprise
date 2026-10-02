@@ -12,16 +12,21 @@ export const ScanQRPage = () => {
   const { branches, employees, recordQRScan, liveScanFeed } = useData();
   const { addToast } = useToast();
 
-  const [scanResult, setScanResult] = useState(null);
-  const supervisorBranchId = user?.branchId;
-  const currentBranch = branches.find((b) => b.id === supervisorBranchId);
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+  const defaultBranchId = user?.branchId || branches[0]?.id || 'BRANCH-001';
+  const [selectedBranchId, setSelectedBranchId] = useState(defaultBranchId);
 
-  // Scoped employees for fast test simulation
-  const branchEmployees = employees.filter((e) => e.branchId === supervisorBranchId);
-  const otherBranchEmployee = employees.find((e) => e.branchId !== supervisorBranchId);
+  const activeBranchId = isSuperAdmin ? selectedBranchId : (user?.branchId || defaultBranchId);
+  const currentBranch = branches.find((b) => b.id === activeBranchId) || branches[0];
+
+  const [scanResult, setScanResult] = useState(null);
+
+  // Scoped employees for test simulation
+  const branchEmployees = employees.filter((e) => e.branchId === activeBranchId);
+  const otherBranchEmployee = employees.find((e) => e.branchId !== activeBranchId);
 
   const handleScan = (qrString) => {
-    const result = recordQRScan(qrString, supervisorBranchId);
+    const result = recordQRScan(qrString, activeBranchId);
     setScanResult(result);
 
     if (result.success) {
@@ -31,10 +36,10 @@ export const ScanQRPage = () => {
         type: 'success',
       });
     } else {
-      let toastTitle = '❌ Scan Error';
-      if (result.reason === 'EARLY_TIMEOUT_BLOCKED') toastTitle = '⏳ Bawal Pa Mag-Time Out';
-      else if (result.reason === 'ALREADY_COMPLETED') toastTitle = '🚫 Scan Limit Reached';
-      else if (result.reason === 'WRONG_BRANCH') toastTitle = '❌ Access Denied: Wrong Branch';
+      let toastTitle = 'Scan Verification Error';
+      if (result.reason === 'EARLY_TIMEOUT_BLOCKED') toastTitle = 'Early Time Out Blocked';
+      else if (result.reason === 'ALREADY_COMPLETED') toastTitle = 'Daily Scan Limit Reached';
+      else if (result.reason === 'WRONG_BRANCH') toastTitle = 'Access Denied: Wrong Branch';
 
       addToast({
         title: toastTitle,
@@ -59,7 +64,7 @@ export const ScanQRPage = () => {
               On-Site Attendance Scanner
             </span>
             <span className="text-xs text-slate-500 font-medium">
-              Branch: {currentBranch?.name} ({supervisorBranchId})
+              Branch: {currentBranch?.name || activeBranchId} ({activeBranchId})
             </span>
           </div>
           <h1 className="mt-1 text-2xl font-bold text-slate-900 tracking-tight">QR Code Attendance Scanner</h1>
@@ -67,13 +72,33 @@ export const ScanQRPage = () => {
             Hold employee QR badge in front of the camera. System automatically computes Time In / Time Out.
           </p>
         </div>
+
+        {isSuperAdmin && (
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-slate-500 font-semibold">Scanner Station Branch:</label>
+            <select
+              value={selectedBranchId}
+              onChange={(e) => {
+                setSelectedBranchId(e.target.value);
+                setScanResult(null);
+              }}
+              className="bg-white border border-slate-200 text-xs text-slate-800 rounded-xl py-2 px-3 focus:ring-2 focus:ring-blue-500 font-semibold shadow-sm"
+            >
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name} ({b.id})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column: Camera Viewport + Result Card */}
         <div className="lg:col-span-7 space-y-4">
           <div className="rounded-3xl bg-white border border-slate-200/80 p-6 shadow-sm">
-            <QRScanner onScanSuccess={handleScan} scannerBranchId={supervisorBranchId} />
+            <QRScanner onScanSuccess={handleScan} scannerBranchId={activeBranchId} />
 
             {/* Scan Feedback Result Card */}
             {scanResult && (
@@ -91,7 +116,7 @@ export const ScanQRPage = () => {
             <div className="flex items-center gap-2 mb-3">
               <Sparkles className="w-4 h-4 text-blue-600" />
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                Quick Test Simulators
+                Quick Test Simulators ({currentBranch?.name || activeBranchId})
               </h3>
             </div>
             <p className="text-xs text-slate-500 mb-3">
@@ -99,7 +124,7 @@ export const ScanQRPage = () => {
             </p>
 
             <div className="space-y-2">
-              {branchEmployees.slice(0, 3).map((emp) => (
+              {branchEmployees.slice(0, 5).map((emp) => (
                 <button
                   key={emp.id}
                   onClick={() => handleSimulateScan(emp)}
@@ -113,9 +138,15 @@ export const ScanQRPage = () => {
                 </button>
               ))}
 
+              {branchEmployees.length === 0 && (
+                <div className="p-4 bg-slate-50 rounded-xl text-center text-xs text-slate-400">
+                  No registered employees assigned to this branch.
+                </div>
+              )}
+
               {/* Wrong branch test trigger to verify strict branch isolation rule */}
               {otherBranchEmployee && (
-                <div className="pt-2">
+                <div className="pt-2 border-t border-slate-100 mt-2">
                   <button
                     onClick={() => handleSimulateScan(otherBranchEmployee)}
                     className="w-full flex items-center justify-between p-3 rounded-xl bg-rose-50 hover:bg-rose-100/80 text-rose-800 border border-rose-200 transition text-left text-xs font-semibold"
@@ -158,7 +189,7 @@ export const ScanQRPage = () => {
                           : 'bg-rose-50 text-rose-700 border-rose-200'
                       }`}
                     >
-                      {scan.action === 'TIME_IN' ? '🟢 Time In' : '🔴 Time Out'}
+                      {scan.action === 'TIME_IN' ? 'Time In' : 'Time Out'}
                     </span>
                     <p className="font-mono text-[11px] text-slate-500 mt-0.5">{scan.time}</p>
                   </div>

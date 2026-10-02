@@ -44,18 +44,22 @@ export const AdminDashboard = () => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [selectedCutoff, setSelectedCutoff] = useState('1-15');
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  })();
 
   // Today's attendance analytics across all branches
   const todayAttendance = useMemo(() => {
-    const logs = attendanceLogs.filter((log) => log.date === todayStr);
+    const logs = attendanceLogs.filter((log) => log && log.date === todayStr && log.timeIn);
     const present = logs.filter((l) => l.status === 'Present').length;
     const late = logs.filter((l) => l.status === 'Late').length;
-    const absent = logs.filter((l) => l.status === 'Absent').length;
-    const onLeave = logs.filter((l) => l.status === 'On Leave').length;
+    const totalPunched = present + late;
+    const absent = Math.max(0, employees.length - totalPunched);
+    const onLeave = attendanceLogs.filter((l) => l && l.date === todayStr && l.status === 'On Leave').length;
     const qrScanned = logs.filter((l) => l.method === 'QR').length;
-    return { present, late, absent, onLeave, qrScanned, total: logs.length };
-  }, [attendanceLogs, todayStr]);
+    return { present, late, absent, onLeave, qrScanned, total: totalPunched };
+  }, [attendanceLogs, employees.length, todayStr]);
 
   // Per Branch Analytics Summary
   const branchSummaries = useMemo(() => {
@@ -63,13 +67,16 @@ export const AdminDashboard = () => {
       const branchEmployees = employees.filter((e) => e.branchId === branch.id);
       const supervisor = users.find((u) => u.id === branch.supervisorId && u.role === 'SUPERVISOR');
       const branchLogsToday = attendanceLogs.filter(
-        (l) => l.branchId === branch.id && l.date === todayStr
+        (l) => (l.branchId === branch.id || branchEmployees.some(e => e.id === l.employeeId)) && l.date === todayStr && l.timeIn
       );
 
       const present = branchLogsToday.filter((l) => l.status === 'Present').length;
       const late = branchLogsToday.filter((l) => l.status === 'Late').length;
-      const absent = branchLogsToday.filter((l) => l.status === 'Absent').length;
-      const onLeave = branchLogsToday.filter((l) => l.status === 'On Leave').length;
+      const totalPunched = present + late;
+      const absent = Math.max(0, branchEmployees.length - totalPunched);
+      const onLeave = attendanceLogs.filter(
+        (l) => (l.branchId === branch.id || branchEmployees.some(e => e.id === l.employeeId)) && l.date === todayStr && l.status === 'On Leave'
+      ).length;
 
       const branchPayroll = branchEmployees.reduce((sum, emp) => {
         const p = computeEmployeePayroll(emp, attendanceLogs, selectedCutoff, selectedMonth, settings);
@@ -87,7 +94,7 @@ export const AdminDashboard = () => {
         absent,
         onLeave,
         branchPayroll,
-        attendanceRate: branchEmployees.length > 0 ? Math.round(((present + late) / branchEmployees.length) * 100) : 0,
+        attendanceRate: branchEmployees.length > 0 ? Math.round((totalPunched / branchEmployees.length) * 100) : 0,
       };
     });
   }, [branches, employees, users, attendanceLogs, todayStr, selectedCutoff, selectedMonth, settings]);

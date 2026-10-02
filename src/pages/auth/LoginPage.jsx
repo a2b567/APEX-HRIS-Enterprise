@@ -237,7 +237,7 @@ export const LoginPage = () => {
       if (res.success && res.user) {
         addToast({
           title: 'ID Verified & Account Created',
-          message: res.message || `Welcome to REDMART Enterprise, ${res.user.name}! ID confirmed.`,
+          message: res.message || `Welcome to REDDMART Enterprise, ${res.user.name}! ID confirmed.`,
           type: 'success',
         });
         loginUserDirectly(res.user);
@@ -273,7 +273,7 @@ export const LoginPage = () => {
             </div>
             <div>
               <h2 className="text-[17px] font-bold tracking-tight text-white leading-snug">
-                REDMART Enterprise
+                REDDMART Enterprise
               </h2>
               <p className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">
                 HUMAN RESOURCE INFORMATION SYSTEM
@@ -470,6 +470,7 @@ export const LoginPage = () => {
                       <input
                         type="text"
                         required
+                        autoComplete="off"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="e.g. Maria Santos or EMP-2026-001"
@@ -489,6 +490,7 @@ export const LoginPage = () => {
                       <input
                         type={showPassword ? 'text' : 'password'}
                         required
+                        autoComplete="new-password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="••••••••••••"

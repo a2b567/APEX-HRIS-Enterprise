@@ -9,7 +9,6 @@ import {
 import { calculateTimeEntry } from '../utils/dtrCalculator';
 import { parseQRPayload, createEmployeeQRToken } from '../utils/qrUtils';
 import { soundFeedback } from '../utils/audioFeedback';
-import { secureStorage } from '../utils/securityUtils';
 import {
   deleteUserFromSupabase,
   deleteEmployeeFromSupabase,
@@ -19,87 +18,31 @@ import {
   fetchEmployeesFromSupabase,
   fetchBranchesFromSupabase,
   fetchAttendanceLogsFromSupabase,
+  logAttendanceToSupabase,
   fetchDisbursementsFromSupabase,
   syncUserToSupabase,
   syncEmployeeToSupabase,
   syncBranchToSupabase,
-  logAttendanceToSupabase,
-  syncDisbursementToSupabase,
-  subscribeToTableChanges,
-  supabase,
+  subscribeToDataChanges,
+  broadcastDataChanged,
 } from '../services/supabaseClient';
 
 export const DataContext = createContext(null);
 
-// v8_redmart: Guaranteed sync of Aron & Marco supervisors across all devices
-const STORAGE_KEY_DATA = 'dtr_payroll_database_v8_redmart';
-const OLD_KEY = 'dtr_payroll_database_v3_clean';
-
-// One-time purge of old cache keys on first load
-const purgeOldCache = () => {
-  const oldKeys = [
-    'dtr_payroll_database_v6_5sup_branches', 'dtr_payroll_database_v6_5sup_users',
-    'dtr_payroll_database_v6_5sup_employees', 'dtr_payroll_database_v6_5sup_attendance',
-    'dtr_payroll_database_v5_testemp_users', 'dtr_payroll_database_v5_testemp_branches',
-    `${OLD_KEY}_branches`, `${OLD_KEY}_employees`, `${OLD_KEY}_users`,
-    `${OLD_KEY}_attendance`, `${OLD_KEY}_settings`, `${OLD_KEY}_scans`,
-    `APEX_ENC_${OLD_KEY}_branches`, `APEX_ENC_${OLD_KEY}_employees`,
-    `APEX_ENC_${OLD_KEY}_users`, `APEX_ENC_${OLD_KEY}_attendance`,
-    `APEX_ENC_${OLD_KEY}_settings`, `APEX_ENC_${OLD_KEY}_scans`,
-    OLD_KEY,
-  ];
-  oldKeys.forEach((k) => {
-    localStorage.removeItem(k);
-    localStorage.removeItem(`APEX_ENC_${k}`);
-  });
-};
-purgeOldCache();
-
 export const DataProvider = ({ children }) => {
-  const [branches, setBranches] = useState(() => {
-    const saved = secureStorage.getItem(`${STORAGE_KEY_DATA}_branches`);
-    if (saved && Array.isArray(saved) && saved.length > 0) {
-      return saved;
-    }
-    return INITIAL_BRANCHES;
-  });
-
-  const [users, setUsers] = useState(() => {
-    const saved = secureStorage.getItem(`${STORAGE_KEY_DATA}_users`);
-    if (saved && Array.isArray(saved)) {
-      return saved;
-    }
-    return INITIAL_USERS;
-  });
-
-  const [employees, setEmployees] = useState(() => {
-    const raw = secureStorage.getItem(`${STORAGE_KEY_DATA}_employees`) || INITIAL_EMPLOYEES;
-    if (!Array.isArray(raw) || raw.length === 0) return INITIAL_EMPLOYEES;
-    
-    // Auto-heal duplicate or missing IDs safely while preserving valid existing IDs
-    const seenIds = new Set();
-    return raw.map((emp, index) => {
-      let uniqueId = emp.id;
-      if (!uniqueId || seenIds.has(uniqueId)) {
-        const branchNum = (emp.branchId || 'BRANCH-001').replace('BRANCH-', '');
-        let seq = index + 1;
-        while (seenIds.has(`EMP-${branchNum}-${String(seq).padStart(2, '0')}`)) {
-          seq++;
-        }
-        uniqueId = `EMP-${branchNum}-${String(seq).padStart(2, '0')}`;
-      }
-      seenIds.add(uniqueId);
-      return {
-        ...emp,
-        id: uniqueId,
-        uid: emp.uid || `EMP_UID_${uniqueId}_${index}`,
-      };
-    });
-  });
-
+  const [branches, setBranches] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [attendanceLogs, setAttendanceLogs] = useState(() => {
-    return secureStorage.getItem(`${STORAGE_KEY_DATA}_attendance`) || generateInitialAttendanceLogs();
+    try {
+      const saved = localStorage.getItem('reddmart_attendance_logs');
+      return saved ? JSON.parse(saved) : generateInitialAttendanceLogs();
+    } catch {
+      return generateInitialAttendanceLogs();
+    }
   });
+  const [disbursements, setDisbursements] = useState({});
+  const [isLoading, setIsLoading] = useState(true);
 
   const attendanceLogsRef = useRef(attendanceLogs);
   useEffect(() => {
@@ -107,229 +50,96 @@ export const DataProvider = ({ children }) => {
   }, [attendanceLogs]);
 
   const [settings, setSettings] = useState(() => {
-    const saved = secureStorage.getItem(`${STORAGE_KEY_DATA}_settings`);
-    if (saved && (saved.companyName === 'Northstar Works' || !saved.companyName)) {
-      return { ...saved, companyName: 'REDMART Enterprise', systemTitle: 'REDMART Enterprise' };
+    try {
+      const saved = localStorage.getItem('reddmart_settings');
+      return saved ? JSON.parse(saved) : INITIAL_SETTINGS;
+    } catch {
+      return INITIAL_SETTINGS;
     }
-    return saved || INITIAL_SETTINGS;
   });
-
-  // Real-time scan telemetry feed for dashboards (fresh empty state)
-  const [liveScanFeed, setLiveScanFeed] = useState(() => {
-    return secureStorage.getItem(`${STORAGE_KEY_DATA}_scans`) || [];
-  });
-
-  // Payroll Disbursement Records Map (key: `${employeeId}_${selectedMonth}_${cutoffType}`)
-  const [disbursements, setDisbursements] = useState(() => {
-    return secureStorage.getItem(`${STORAGE_KEY_DATA}_disbursements`) || {};
-  });
-
-  // Save changes with AES-256 encrypted storage
+  const settingsRef = useRef(settings);
   useEffect(() => {
-    secureStorage.setItem(`${STORAGE_KEY_DATA}_branches`, branches);
-  }, [branches]);
-
-  useEffect(() => {
-    secureStorage.setItem(`${STORAGE_KEY_DATA}_users`, users);
-  }, [users]);
-
-  useEffect(() => {
-    secureStorage.setItem(`${STORAGE_KEY_DATA}_employees`, employees);
-  }, [employees]);
-
-  useEffect(() => {
-    secureStorage.setItem(`${STORAGE_KEY_DATA}_attendance`, attendanceLogs);
-  }, [attendanceLogs]);
-
-  useEffect(() => {
-    secureStorage.setItem(`${STORAGE_KEY_DATA}_settings`, settings);
+    settingsRef.current = settings;
   }, [settings]);
 
+  const [liveScanFeed, setLiveScanFeed] = useState([]);
+
+  // Stable ref to silentRefresh so it can be called from outside the useEffect
+  const silentRefreshRef = useRef(null);
+
+  // ── Load all data from Supabase. Each table fetches INDEPENDENTLY. ──
   useEffect(() => {
-    secureStorage.setItem(`${STORAGE_KEY_DATA}_scans`, liveScanFeed);
-  }, [liveScanFeed]);
+    if (!isSupabaseConfigured()) {
+      setBranches(INITIAL_BRANCHES);
+      setUsers(INITIAL_USERS);
+      setEmployees(INITIAL_EMPLOYEES);
+      setIsLoading(false);
+      return;
+    }
 
-  useEffect(() => {
-    secureStorage.setItem(`${STORAGE_KEY_DATA}_disbursements`, disbursements);
-  }, [disbursements]);
-
-  // ── Multi-Tab Real-Time Storage Listener ─────────────────────────────────
-  useEffect(() => {
-    const handleStorageChange = (e) => {
-      if (!e.key) return;
-      if (e.key.includes(`${STORAGE_KEY_DATA}_users`) || e.key.includes(`APEX_ENC_${STORAGE_KEY_DATA}_users`)) {
-        const updated = secureStorage.getItem(`${STORAGE_KEY_DATA}_users`);
-        if (updated && Array.isArray(updated)) setUsers(updated);
-      }
-      if (e.key.includes(`${STORAGE_KEY_DATA}_branches`) || e.key.includes(`APEX_ENC_${STORAGE_KEY_DATA}_branches`)) {
-        const updated = secureStorage.getItem(`${STORAGE_KEY_DATA}_branches`);
-        if (updated && Array.isArray(updated)) setBranches(updated);
-      }
-      if (e.key.includes(`${STORAGE_KEY_DATA}_employees`) || e.key.includes(`APEX_ENC_${STORAGE_KEY_DATA}_employees`)) {
-        const updated = secureStorage.getItem(`${STORAGE_KEY_DATA}_employees`);
-        if (updated && Array.isArray(updated)) setEmployees(updated);
-      }
-      if (e.key.includes(`${STORAGE_KEY_DATA}_attendance`) || e.key.includes(`APEX_ENC_${STORAGE_KEY_DATA}_attendance`)) {
-        const updated = secureStorage.getItem(`${STORAGE_KEY_DATA}_attendance`);
-        if (updated && Array.isArray(updated)) setAttendanceLogs(updated);
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
-
-  // ── Supabase Real-Time Channel Subscription (Cross-Device Sync) ──────────
-  useEffect(() => {
-    if (!isSupabaseConfigured() || !supabase) return;
-
-    const channel = supabase
-      .channel('schema-db-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, async () => {
-        try {
-          const cloudUsers = await fetchUsersFromSupabase();
-          if (cloudUsers && cloudUsers.length > 0) setUsers(cloudUsers);
-        } catch (e) {}
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'employees' }, async () => {
-        try {
-          const cloudEmps = await fetchEmployeesFromSupabase();
-          if (cloudEmps && cloudEmps.length > 0) setEmployees(cloudEmps);
-        } catch (e) {}
-      })
-      .subscribe();
-
-    return () => {
-      try {
-        supabase.removeChannel(channel);
-      } catch (e) {}
-    };
-  }, []);
-
-  // ── Cloud Sync: Realtime + Polling Fallback (Multi-Device Alignment) ──
-  useEffect(() => {
-    if (!isSupabaseConfigured()) return;
-
-    const syncCloudData = async () => {
-      try {
-        const [cloudUsers, cloudEmployees, cloudBranches, cloudAttendance, cloudDisbursements] = await Promise.all([
-          fetchUsersFromSupabase(),
+    // ── silentRefresh: updates data in background without showing skeleton ──
+    const silentRefresh = async () => {
+      const [empRes, userRes, branchRes, attendRes, disburseRes] =
+        await Promise.allSettled([
           fetchEmployeesFromSupabase(),
+          fetchUsersFromSupabase(),
           fetchBranchesFromSupabase(),
           fetchAttendanceLogsFromSupabase(),
           fetchDisbursementsFromSupabase(),
         ]);
 
-        // 1. Users — push local-only users to cloud, then align state from cloud master
-        const localUsers = secureStorage.getItem(`${STORAGE_KEY_DATA}_users`) || INITIAL_USERS;
-        const cloudUserIds = new Set((cloudUsers || []).map((u) => String(u.id)));
-        const cloudUsernames = new Set((cloudUsers || []).map((u) => u.username));
-        if (Array.isArray(localUsers)) {
-          for (const lUser of localUsers) {
-            if (!lUser || !lUser.id) continue;
-            // Push to cloud if neither ID nor username exists there
-            if (!cloudUserIds.has(String(lUser.id)) && !cloudUsernames.has(lUser.username)) {
-              syncUserToSupabase(lUser).catch(() => {});
-            }
-          }
-        }
-        // Cloud is authoritative — merge any extra local fields not stored in cloud
-        const userMap = new Map();
-        (cloudUsers || []).forEach((u) => { if (u && u.id) userMap.set(String(u.id), u); });
-        (localUsers || []).forEach((lUser) => {
-          if (!lUser || !lUser.id) return;
-          const existing = userMap.get(String(lUser.id));
-          if (existing) {
-            // Enrich cloud record with any extra local-only fields (e.g. UI metadata)
-            userMap.set(String(lUser.id), { ...lUser, ...existing });
-          }
-        });
-        const alignedUsers = Array.from(userMap.values());
-        if (alignedUsers.length > 0) {
-          setUsers(alignedUsers);
-          secureStorage.setItem(`${STORAGE_KEY_DATA}_users`, alignedUsers);
-        }
-
-        // 2. Employees — push ALL local employees missing from cloud (by ID OR name)
-        const localEmployees = secureStorage.getItem(`${STORAGE_KEY_DATA}_employees`) || INITIAL_EMPLOYEES;
-        const cloudEmpIds = new Set((cloudEmployees || []).map((e) => String(e.id)));
-        const cloudEmpNames = new Set((cloudEmployees || []).map((e) => (e.name || '').toLowerCase().trim()));
-        if (Array.isArray(localEmployees)) {
-          for (const lEmp of localEmployees) {
-            if (!lEmp || !lEmp.id) continue;
-            const nameKey = (lEmp.name || '').toLowerCase().trim();
-            // Push to cloud if this employee doesn't exist by ID or by full name
-            if (!cloudEmpIds.has(String(lEmp.id)) || !cloudEmpNames.has(nameKey)) {
-              syncEmployeeToSupabase(lEmp).catch(() => {});
-            }
-          }
-        }
-        // Cloud is authoritative — merge extra local-only fields
-        const empMap = new Map();
-        (cloudEmployees || []).forEach((e) => { if (e && e.id) empMap.set(String(e.id), e); });
-        (localEmployees || []).forEach((lEmp) => {
-          if (!lEmp || !lEmp.id) return;
-          const existing = empMap.get(String(lEmp.id));
-          if (existing) {
-            empMap.set(String(lEmp.id), {
-              ...lEmp,
-              ...existing,
-              uid: lEmp.uid || existing.uid || `EMP_UID_${existing.id}`,
-              employmentType: existing.employmentType || lEmp.employmentType || 'Regular Full-Time',
-              tin: existing.tin || lEmp.tin || '',
-              sss: existing.sss || lEmp.sss || '',
-              philhealth: existing.philhealth || lEmp.philhealth || '',
-              pagibig: existing.pagibig || lEmp.pagibig || '',
-              bankAccount: existing.bankAccount || lEmp.bankAccount || '',
-              idVerificationStatus: existing.idVerificationStatus || lEmp.idVerificationStatus || 'Verified',
-              idType: existing.idType || lEmp.idType || 'Government ID / PhilID',
+      if (empRes.status === 'fulfilled' && Array.isArray(empRes.value)) {
+        setEmployees(empRes.value.length > 0 ? empRes.value : prev => prev);
+      }
+      if (userRes.status === 'fulfilled' && Array.isArray(userRes.value)) {
+        setUsers(userRes.value.length > 0 ? userRes.value : INITIAL_USERS);
+      }
+      if (branchRes.status === 'fulfilled' && Array.isArray(branchRes.value)) {
+        setBranches(branchRes.value.length > 0 ? branchRes.value : INITIAL_BRANCHES);
+      }
+      if (attendRes.status === 'fulfilled' && Array.isArray(attendRes.value)) {
+        if (attendRes.value.length > 0) {
+          setAttendanceLogs((prev) => {
+            const remoteMap = new Map(attendRes.value.map((l) => [l.id, l]));
+            const merged = [...attendRes.value];
+            (prev || []).forEach((p) => {
+              if (p && !remoteMap.has(p.id)) merged.push(p);
             });
-          }
-        });
-        const alignedEmployees = Array.from(empMap.values());
-        if (alignedEmployees.length > 0) {
-          setEmployees(alignedEmployees);
-          secureStorage.setItem(`${STORAGE_KEY_DATA}_employees`, alignedEmployees);
+            try { localStorage.setItem('reddmart_attendance_logs', JSON.stringify(merged)); } catch (_) {}
+            return merged;
+          });
         }
-
-        // 3. Branches — Cloud is authoritative
-        if (Array.isArray(cloudBranches) && cloudBranches.length > 0) {
-          setBranches(cloudBranches);
-          secureStorage.setItem(`${STORAGE_KEY_DATA}_branches`, cloudBranches);
-        }
-
-        // 4. Attendance Logs — Cloud is authoritative
-        if (Array.isArray(cloudAttendance)) {
-          setAttendanceLogs(cloudAttendance);
-          secureStorage.setItem(`${STORAGE_KEY_DATA}_attendance`, cloudAttendance);
-        }
-
-        // 5. Disbursements — Cloud is authoritative
-        if (cloudDisbursements && typeof cloudDisbursements === 'object') {
-          setDisbursements(cloudDisbursements);
-          secureStorage.setItem(`${STORAGE_KEY_DATA}_disbursements`, cloudDisbursements);
-        }
-      } catch (err) {
-        console.warn('[Supabase Sync] Background sync error:', err);
+      }
+      if (disburseRes.status === 'fulfilled') {
+        setDisbursements(disburseRes.value || {});
       }
     };
 
-    // ── Run immediately on mount
-    syncCloudData();
+    // Store ref so refreshData() in context can call it
+    silentRefreshRef.current = silentRefresh;
+    const initialLoad = async () => {
+      setIsLoading(true);
+      console.log('[DB] Initial load from Supabase...');
+      await silentRefresh();
+      setIsLoading(false);
+      console.log('[DB] Initial load complete.');
+    };
 
-    // ── Supabase Realtime: instant push notifications when any device changes data
-    const realtimeTables = ['employees', 'users', 'branches', 'attendance_logs', 'disbursements'];
-    const channels = realtimeTables.map((table) =>
-      subscribeToTableChanges(table, syncCloudData)
-    );
+    // Run on mount (shows skeleton while loading)
+    initialLoad();
 
-    // ── Polling fallback every 10 seconds (catches missed Realtime events)
-    const interval = setInterval(syncCloudData, 10000);
+    // Realtime: instant cross-device sync via Supabase Broadcast
+    const channel = subscribeToDataChanges(silentRefresh);
+
+    // 5s polling fallback — silent background, no skeleton flicker
+    const interval = setInterval(silentRefresh, 5000);
 
     return () => {
       clearInterval(interval);
-      channels.forEach((ch) => { if (ch) ch.unsubscribe(); });
+      try { channel?.unsubscribe(); } catch (_) {}
     };
   }, []);
+
 
   // Reset database back to clean seed
   const resetToFactoryDefaults = () => {
@@ -339,7 +149,6 @@ export const DataProvider = ({ children }) => {
     setAttendanceLogs(generateInitialAttendanceLogs());
     setSettings(INITIAL_SETTINGS);
     setLiveScanFeed([]);
-    localStorage.clear();
   };
 
   /**
@@ -347,9 +156,10 @@ export const DataProvider = ({ children }) => {
    * Strict Rule: Exactly 1 Supervisor per Branch.
    */
   const reassignSupervisorToBranch = (supervisorId, newBranchId) => {
+    const numId = Number(supervisorId);
     if (newBranchId) {
       const conflictingSupervisor = users.find(
-        (u) => u.role === 'SUPERVISOR' && u.branchId === newBranchId && u.id !== Number(supervisorId) && u.status === 'Active'
+        (u) => u.role === 'SUPERVISOR' && u.branchId === newBranchId && u.id !== numId && u.status === 'Active'
       );
 
       if (conflictingSupervisor) {
@@ -360,26 +170,40 @@ export const DataProvider = ({ children }) => {
       }
     }
 
-    setUsers((prev) =>
-      prev.map((u) => {
-        if (u.id === Number(supervisorId)) {
-          return { ...u, branchId: newBranchId };
+    setUsers((prev) => {
+      const updated = prev.map((u) => {
+        if (u.id === numId) {
+          const uUser = { ...u, branchId: newBranchId };
+          if (isSupabaseConfigured()) {
+            syncUserToSupabase(uUser).catch(() => {});
+          }
+          return uUser;
         }
         return u;
-      })
-    );
+      });
+      return updated;
+    });
 
-    setBranches((prev) =>
-      prev.map((b) => {
+    setBranches((prev) => {
+      const updated = prev.map((b) => {
         if (b.id === newBranchId) {
-          return { ...b, supervisorId: Number(supervisorId) };
+          const uBranch = { ...b, supervisorId: numId };
+          if (isSupabaseConfigured()) {
+            syncBranchToSupabase(uBranch).catch(() => {});
+          }
+          return uBranch;
         }
-        if (b.supervisorId === Number(supervisorId) && b.id !== newBranchId) {
-          return { ...b, supervisorId: null };
+        if (b.supervisorId === numId && b.id !== newBranchId) {
+          const uBranch = { ...b, supervisorId: null };
+          if (isSupabaseConfigured()) {
+            syncBranchToSupabase(uBranch).catch(() => {});
+          }
+          return uBranch;
         }
         return b;
-      })
-    );
+      });
+      return updated;
+    });
 
     return { success: true, message: 'Supervisor reassigned successfully.' };
   };
@@ -423,12 +247,13 @@ export const DataProvider = ({ children }) => {
   };
 
   const updateSupervisor = (id, updatedFields) => {
+    const numId = Number(id);
     if (updatedFields.branchId) {
       const existing = users.find(
         (u) =>
           u.role === 'SUPERVISOR' &&
           u.branchId === updatedFields.branchId &&
-          u.id !== Number(id) &&
+          u.id !== numId &&
           u.status === 'Active'
       );
       if (existing) {
@@ -439,35 +264,46 @@ export const DataProvider = ({ children }) => {
       }
     }
 
-    setUsers((prev) =>
-      prev.map((u) => (u.id === Number(id) ? { ...u, ...updatedFields } : u))
-    );
+    let targetPayload = null;
+    setUsers((prev) => {
+      const updated = prev.map((u) => {
+        if (u.id === numId) {
+          const merged = { ...u, ...updatedFields };
+          targetPayload = merged;
+          return merged;
+        }
+        return u;
+      });
+      return updated;
+    });
 
     if (updatedFields.branchId !== undefined) {
-      setBranches((prev) =>
-        prev.map((b) => {
-          if (b.id === updatedFields.branchId) return { ...b, supervisorId: Number(id) };
-          if (b.supervisorId === Number(id) && b.id !== updatedFields.branchId) return { ...b, supervisorId: null };
+      setBranches((prev) => {
+        const updated = prev.map((b) => {
+          if (b.id === updatedFields.branchId) return { ...b, supervisorId: numId };
+          if (b.supervisorId === numId && b.id !== updatedFields.branchId) return { ...b, supervisorId: null };
           return b;
-        })
-      );
+        });
+        return updated;
+      });
     }
 
-    if (isSupabaseConfigured()) {
-      const targetUser = users.find((u) => u.id === Number(id));
-      if (targetUser) {
-        syncUserToSupabase({ ...targetUser, ...updatedFields }).catch(() => {});
-      }
+    if (isSupabaseConfigured() && targetPayload) {
+      syncUserToSupabase(targetPayload).catch(() => {});
     }
 
     return { success: true };
   };
 
   const toggleSupervisorStatus = (id) => {
+    const numId = Number(id);
     setUsers((prev) =>
       prev.map((u) => {
-        if (u.id === Number(id)) {
+        if (u.id === numId) {
           const newStatus = u.status === 'Active' ? 'Inactive' : 'Active';
+          if (isSupabaseConfigured()) {
+            syncUserToSupabase({ ...u, status: newStatus }).catch(() => {});
+          }
           return { ...u, status: newStatus };
         }
         return u;
@@ -476,18 +312,28 @@ export const DataProvider = ({ children }) => {
   };
 
   const deleteSupervisor = (id) => {
-    const sup = users.find((u) => u.id === Number(id) && u.role === 'SUPERVISOR');
+    const numId = Number(id);
+    const sup = users.find((u) => u.id === numId && u.role === 'SUPERVISOR');
     if (!sup) return { success: false, message: 'Supervisor not found.' };
 
-    setUsers((prev) => prev.filter((u) => u.id !== Number(id)));
+    setUsers((prev) => prev.filter((u) => u.id !== numId));
 
     // Unassign from any branch
     setBranches((prev) =>
-      prev.map((b) => (b.supervisorId === Number(id) ? { ...b, supervisorId: null } : b))
+      prev.map((b) => {
+        if (b.supervisorId === numId) {
+          const uBranch = { ...b, supervisorId: null };
+          if (isSupabaseConfigured()) {
+            syncBranchToSupabase(uBranch).catch(() => {});
+          }
+          return uBranch;
+        }
+        return b;
+      })
     );
 
     if (isSupabaseConfigured()) {
-      deleteUserFromSupabase(Number(id)).catch(() => {});
+      deleteUserFromSupabase(numId).catch(() => {});
     }
 
     return { success: true };
@@ -516,7 +362,9 @@ export const DataProvider = ({ children }) => {
     setBranches((prev) => [...prev, newBranch]);
 
     if (isSupabaseConfigured()) {
-      syncBranchToSupabase(newBranch).catch(() => {});
+      syncBranchToSupabase(newBranch)
+        .then(() => broadcastDataChanged('branches'))
+        .catch(() => {});
     }
 
     return { success: true, branch: newBranch };
@@ -532,13 +380,25 @@ export const DataProvider = ({ children }) => {
     }
 
     setBranches((prev) => prev.filter((b) => b.id !== branchId));
+
     // Clear the branch from any supervisor records
     setUsers((prev) =>
-      prev.map((u) => (u.branchId === branchId ? { ...u, branchId: null } : u))
+      prev.map((u) => {
+        if (u.branchId === branchId) {
+          const uUser = { ...u, branchId: null };
+          if (isSupabaseConfigured()) {
+            syncUserToSupabase(uUser).catch(() => {});
+          }
+          return uUser;
+        }
+        return u;
+      })
     );
 
     if (isSupabaseConfigured()) {
-      deleteBranchFromSupabase(branchId).catch(() => {});
+      deleteBranchFromSupabase(branchId)
+        .then(() => broadcastDataChanged('branches'))
+        .catch(() => {});
     }
     return { success: true };
   };
@@ -658,15 +518,20 @@ export const DataProvider = ({ children }) => {
     setEmployees((prev) => [...prev, newEmployee]);
 
     if (isSupabaseConfigured()) {
-      syncEmployeeToSupabase(newEmployee).catch(() => {});
-      if (createdUser) syncUserToSupabase(createdUser).catch(() => {});
+      if (createdUser) {
+        syncUserToSupabase(createdUser)
+          .then(() => syncEmployeeToSupabase(newEmployee))
+          .catch(() => {});
+      } else {
+        syncEmployeeToSupabase(newEmployee).catch(() => {});
+      }
     }
 
     return { success: true, employee: newEmployee, user: createdUser };
   };
 
   /**
-   * BULK IMPORT EMPLOYEES (Ensures unique sequential IDs and unique user accounts + direct DB save)
+   * BULK IMPORT EMPLOYEES
    */
   const addEmployeesBulk = async (empList) => {
     let currentEmployees = [...employees];
@@ -678,7 +543,6 @@ export const DataProvider = ({ children }) => {
       const branchId = empData.branchId || 'BRANCH-001';
       const newEmpId = getNextEmployeeId(branchId, currentEmployees);
 
-      // Clean unique username
       const cleanName = (empData.name || 'Staff')
         .toLowerCase()
         .trim()
@@ -737,14 +601,13 @@ export const DataProvider = ({ children }) => {
 
     setEmployees(currentEmployees);
     setUsers(currentUsers);
-    secureStorage.setItem(`${STORAGE_KEY_DATA}_employees`, currentEmployees);
-    secureStorage.setItem(`${STORAGE_KEY_DATA}_users`, currentUsers);
 
-    // Save directly to cloud database (Supabase) immediately
+    // Save to Supabase and broadcast to all devices
     if (isSupabaseConfigured()) {
       try {
         await Promise.all(addedUsers.map((u) => syncUserToSupabase(u)));
         await Promise.all(addedEmployees.map((emp) => syncEmployeeToSupabase(emp)));
+        broadcastDataChanged('employees'); // 🔔 Notify all other devices immediately
       } catch (err) {
         console.warn('[DB Sync] Bulk sync error:', err);
       }
@@ -770,59 +633,57 @@ export const DataProvider = ({ children }) => {
     if (isSupabaseConfigured()) {
       const emp = employees.find((e) => e.id === employeeId || (e.uid && updates.uid && e.uid === updates.uid));
       if (emp) {
-        syncEmployeeToSupabase({ ...emp, ...updates }).catch(() => {});
+        syncEmployeeToSupabase({ ...emp, ...updates })
+          .then(() => broadcastDataChanged('employees'))
+          .catch(() => {});
       }
     }
     return { success: true };
   };
 
   /**
-   * DELETE EMPLOYEE — Strictly deletes only ONE single target record
+   * DELETE EMPLOYEE
    */
   const deleteEmployee = (target) => {
-    let deletedId = null;
-    let deletedUserId = null;
+    let targetEmp = null;
 
-    setEmployees((prev) => {
-      let indexToRemove = -1;
-
-      // 1. If target is an object with uid, find by uid
-      if (typeof target === 'object' && target !== null) {
-        if (target.uid) {
-          indexToRemove = prev.findIndex((e) => e.uid === target.uid);
-        }
-        // 2. If no uid, find by id and matching name
-        if (indexToRemove === -1 && target.id && target.name) {
-          indexToRemove = prev.findIndex((e) => e.id === target.id && e.name === target.name);
-        }
-        // 3. Fallback to first matching id
-        if (indexToRemove === -1 && target.id) {
-          indexToRemove = prev.findIndex((e) => e.id === target.id);
-        }
-      } else {
-        // String ID or UID passed
-        indexToRemove = prev.findIndex((e) => e.uid === target || e.id === target);
+    if (typeof target === 'object' && target !== null) {
+      if (target.uid) {
+        targetEmp = employees.find((e) => e.uid === target.uid);
       }
-
-      if (indexToRemove === -1) return prev;
-
-      deletedId = prev[indexToRemove].id;
-      deletedUserId = prev[indexToRemove].userId;
-      const clone = [...prev];
-      clone.splice(indexToRemove, 1); // Strictly remove exactly 1 single employee item!
-      return clone;
-    });
-
-    if (deletedId) {
-      setAttendanceLogs((prev) => prev.filter((l) => l.employeeId !== deletedId));
-      if (deletedUserId) {
-        setUsers((prev) => prev.filter((u) => u.id !== deletedUserId && u.employeeId !== deletedId));
+      if (!targetEmp && target.id && target.name) {
+        targetEmp = employees.find((e) => e.id === target.id && e.name === target.name);
       }
-      if (isSupabaseConfigured()) {
-        deleteEmployeeFromSupabase(deletedId).catch(() => {});
-        if (deletedUserId) deleteUserFromSupabase(deletedUserId).catch(() => {});
+      if (!targetEmp && target.id) {
+        targetEmp = employees.find((e) => e.id === target.id);
       }
+    } else {
+      targetEmp = employees.find((e) => e.uid === target || e.id === target);
     }
+
+    if (!targetEmp) return { success: false, message: 'Employee not found' };
+
+    const deletedId = targetEmp.id;
+    const deletedUserId = targetEmp.userId;
+
+    setEmployees((prev) =>
+      prev.filter((e) => e.id !== deletedId && (!targetEmp.uid || e.uid !== targetEmp.uid))
+    );
+    setAttendanceLogs((prev) => prev.filter((l) => l.employeeId !== deletedId));
+
+    if (deletedUserId) {
+      setUsers((prev) => prev.filter((u) => u.id !== deletedUserId && u.employeeId !== deletedId));
+    } else {
+      setUsers((prev) => prev.filter((u) => u.employeeId !== deletedId));
+    }
+
+    if (isSupabaseConfigured()) {
+      deleteEmployeeFromSupabase(deletedId)
+        .then(() => broadcastDataChanged('employees'))
+        .catch(() => {});
+      if (deletedUserId) deleteUserFromSupabase(deletedUserId).catch(() => {});
+    }
+
     return { success: true };
   };
 
@@ -867,6 +728,13 @@ export const DataProvider = ({ children }) => {
       prev.map((e) => (e.id === employeeId ? { ...e, userId: nextUserId } : e))
     );
 
+    if (isSupabaseConfigured()) {
+      (async () => {
+        await syncUserToSupabase(newUser);
+        await syncEmployeeToSupabase({ ...employee, userId: nextUserId });
+      })().catch(() => {});
+    }
+
     return { success: true, user: newUser, message: `Account created for ${employee.name} (@${finalUsername})` };
   };
 
@@ -875,18 +743,19 @@ export const DataProvider = ({ children }) => {
     if (!emp) return { success: false, message: 'Employee not found' };
 
     const todayStr = new Date().toISOString().split('T')[0];
+    const updatedFields = {
+      idVerificationStatus: status,
+      idVerifiedAt: status === 'Verified' ? todayStr : null,
+      idVerifiedBy: status === 'Verified' ? verifiedBy : null,
+    };
+
     setEmployees((prev) =>
-      prev.map((e) =>
-        e.id === employeeId
-          ? {
-              ...e,
-              idVerificationStatus: status,
-              idVerifiedAt: status === 'Verified' ? todayStr : null,
-              idVerifiedBy: status === 'Verified' ? verifiedBy : null,
-            }
-          : e
-      )
+      prev.map((e) => (e.id === employeeId ? { ...e, ...updatedFields } : e))
     );
+
+    if (isSupabaseConfigured()) {
+      syncEmployeeToSupabase({ ...emp, ...updatedFields }).catch(() => {});
+    }
 
     return {
       success: true,
@@ -899,7 +768,6 @@ export const DataProvider = ({ children }) => {
     const emailQuery = (regData.email || '').trim().toLowerCase();
     const empIdQuery = (regData.employeeId || '').trim().toUpperCase();
 
-    // Look for existing employee
     let matchedEmp = employees.find((e) => {
       if (empIdQuery && e.id.toUpperCase() === empIdQuery) return true;
       if (emailQuery && e.email && e.email.toLowerCase() === emailQuery) return true;
@@ -910,7 +778,6 @@ export const DataProvider = ({ children }) => {
     const targetBranchId = regData.branchId || (matchedEmp ? matchedEmp.branchId : (branches[0]?.id || 'BRANCH-001'));
     let assignedEmp = matchedEmp;
 
-    // Default if no employee name on the system: create employee record with ID verification
     if (!assignedEmp) {
       const branchEmployees = employees.filter((e) => e.branchId === targetBranchId);
       const branchNumber = targetBranchId.replace('BRANCH-', '');
@@ -942,7 +809,6 @@ export const DataProvider = ({ children }) => {
       };
       setEmployees((prev) => [...prev, assignedEmp]);
     } else if (regData.idDocumentUrl) {
-      // Update existing employee's ID document if provided
       setEmployees((prev) =>
         prev.map((e) =>
           e.id === assignedEmp.id
@@ -1029,12 +895,7 @@ export const DataProvider = ({ children }) => {
   };
 
   /**
-   * QR SCAN ATTENDANCE ENGINE (WITH STRICT BRANCH VALIDATION)
-   * NOTE: QR token must be validated server-side (Go Fiber) in real deployment.
-   * Frontend check is only for UX. Backend must verify:
-   *   1. Token signature is valid
-   *   2. Employee's branch_id === supervisor's branch_id
-   *   3. Token not expired / revoked
+   * QR SCAN ATTENDANCE ENGINE
    */
   const recordQRScan = (qrString, scannerBranchId) => {
     const parsed = parseQRPayload(qrString);
@@ -1067,7 +928,6 @@ export const DataProvider = ({ children }) => {
       };
     }
 
-    // Branch Isolation Check (Super Admin scanner passes scannerBranchId === null to allow all)
     if (scannerBranchId && employee.branchId !== scannerBranchId) {
       soundFeedback.playError();
       const empBranch = branches.find((b) => b.id === employee.branchId);
@@ -1088,7 +948,17 @@ export const DataProvider = ({ children }) => {
     const timeHHMM = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
     const displayTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
-    // Look up in synchronous ref
+    const currentSettings = settingsRef.current || settings;
+    const currentShift = currentSettings?.defaultShift || { startTime: '08:00', endTime: '17:00', gracePeriodMinutes: 15 };
+
+    const formatTime12 = (hhmm) => {
+      if (!hhmm) return '';
+      const [h, m] = hhmm.split(':').map(Number);
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const h12 = h % 12 || 12;
+      return `${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
+    };
+
     const currentLogs = [...(attendanceLogsRef.current || [])];
     const existingIndex = currentLogs.findIndex(
       (log) =>
@@ -1099,9 +969,9 @@ export const DataProvider = ({ children }) => {
 
     const existingLog = existingIndex >= 0 ? currentLogs[existingIndex] : null;
 
-    // Case 1: No Time In recorded yet today -> Record Time In
+    // FIRST SCAN: TIME IN
     if (!existingLog || !existingLog.timeIn) {
-      const calc = calculateTimeEntry(timeHHMM, null, 60, settings.defaultShift);
+      const calc = calculateTimeEntry(timeHHMM, null, 60, currentShift);
       const status = calc.lateMinutes > 0 ? 'Late' : 'Present';
 
       const newLog = {
@@ -1133,8 +1003,10 @@ export const DataProvider = ({ children }) => {
 
       attendanceLogsRef.current = nextLogs;
       setAttendanceLogs(nextLogs);
+      try { localStorage.setItem('reddmart_attendance_logs', JSON.stringify(nextLogs)); } catch (_) {}
+      logAttendanceToSupabase(newLog);
+      try { broadcastDataChanged(); } catch (_) {}
 
-      // Add to live telemetry feed
       const scanEntry = {
         id: `scan-${Date.now()}`,
         employeeId: employee.id,
@@ -1161,32 +1033,30 @@ export const DataProvider = ({ children }) => {
         time: displayTime,
         lateMinutes: calc.lateMinutes,
         employee,
-        message: `🟢 TIME IN: Na-record ang Time In ni ${employee.name} (${displayTime}) - ${status === 'Late' ? `${calc.lateMinutes}m Late` : 'On Time'}.`,
+        message: `Time In recorded for ${employee.name} at ${displayTime} (${status === 'Late' ? `${calc.lateMinutes} mins late` : 'On Time'}).`,
       };
     }
 
-    // Case 2: Has Time In, but no Time Out -> Record Time Out
+    // SECOND SCAN: TIME OUT
     if (existingLog.timeIn && !existingLog.timeOut) {
-      // ── Shift Schedule Time Out Verification ──
-      const shiftEndTime = settings.defaultShift?.endTime || '17:00';
+      const shiftEndTime = currentShift?.endTime || '17:00';
       const [nowH, nowM] = timeHHMM.split(':').map(Number);
       const [shiftEndH, shiftEndM] = shiftEndTime.split(':').map(Number);
       const currentTotalM = nowH * 60 + nowM;
       const shiftEndTotalM = shiftEndH * 60 + shiftEndM;
 
-      // Check if current time is earlier than scheduled dismissal time
       if (currentTotalM < shiftEndTotalM) {
         try { soundFeedback.playError(); } catch (e) {}
-        const formattedEndTime = shiftEndTime === '17:00' ? '05:00 PM' : shiftEndTime;
+        const formattedEndTime = formatTime12(shiftEndTime);
         return {
           success: false,
           reason: 'EARLY_TIMEOUT_BLOCKED',
           employee,
-          message: `🚫 BAWAL PA MAG-TIME OUT: Hindi pa oras ng dismissal (${formattedEndTime}). Ang kasalukuyang oras pa lamang ay ${displayTime}. Mangyaring mag-scan sa tamang oras ng labasan.`,
+          message: `Early Time Out blocked: Shift dismissal is scheduled at ${formattedEndTime}. Current time is ${displayTime}. Please scan at the scheduled dismissal time.`,
         };
       }
 
-      const calc = calculateTimeEntry(existingLog.timeIn, timeHHMM, existingLog.breakMinutes || 60, settings.defaultShift);
+      const calc = calculateTimeEntry(existingLog.timeIn, timeHHMM, existingLog.breakMinutes || 60, currentShift);
 
       const updatedRecord = {
         ...existingLog,
@@ -1203,6 +1073,9 @@ export const DataProvider = ({ children }) => {
       nextLogs[existingIndex] = updatedRecord;
       attendanceLogsRef.current = nextLogs;
       setAttendanceLogs(nextLogs);
+      try { localStorage.setItem('reddmart_attendance_logs', JSON.stringify(nextLogs)); } catch (_) {}
+      logAttendanceToSupabase(updatedRecord);
+      try { broadcastDataChanged(); } catch (_) {}
 
       const scanEntry = {
         id: `scan-${Date.now()}`,
@@ -1227,17 +1100,17 @@ export const DataProvider = ({ children }) => {
         totalHours: calc.regularHours,
         overtimeHours: calc.overtimeHours,
         employee,
-        message: `🔴 TIME OUT: Na-record ang Time Out ni ${employee.name} (${displayTime}). Total rendered: ${calc.regularHours} hrs${calc.overtimeHours > 0 ? ` (+${calc.overtimeHours}h OT)` : ''}.`,
+        message: `Time Out recorded for ${employee.name} at ${displayTime}. Total rendered: ${calc.regularHours} hrs${calc.overtimeHours > 0 ? ` (+${calc.overtimeHours} hrs OT)` : ''}.`,
       };
     }
 
-    // Case 3: Both Time In and Time Out already completed -> STRICT ERROR / BLOCKED
+    // THIRD SCAN OR MORE: BLOCKED (TWICE A DAY LIMIT REACHED)
     try { soundFeedback.playError(); } catch (e) {}
     return {
       success: false,
       reason: 'ALREADY_COMPLETED',
       employee,
-      message: `🚫 BAWAL NA I-SCAN: Nakapag-Time In (${existingLog.timeIn}) at Time Out (${existingLog.timeOut}) na si ${employee.name} ngayong araw. (Isang IN at isang OUT lang bawat araw!)`,
+      message: `Daily scan limit reached: ${employee.name} has already completed Time In (${existingLog.timeIn}) and Time Out (${existingLog.timeOut}) for today (Limit: 1 In and 1 Out per day).`,
     };
   };
 
@@ -1246,12 +1119,17 @@ export const DataProvider = ({ children }) => {
    */
   const recordPunch = (employeeId, type = 'IN', customTime = null) => {
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
+    const localYear = now.getFullYear();
+    const localMonth = String(now.getMonth() + 1).padStart(2, '0');
+    const localDay = String(now.getDate()).padStart(2, '0');
+    const todayStr = `${localYear}-${localMonth}-${localDay}`;
     const timeHHMM = customTime || `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
     const displayTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
     const employee = employees.find((e) => e.id === employeeId);
     if (!employee) return { success: false, message: 'Employee not found' };
+
+    const currentShift = settingsRef.current?.defaultShift || settings?.defaultShift || { startTime: '08:00', endTime: '17:00', gracePeriodMinutes: 15 };
 
     const existingIndex = attendanceLogs.findIndex(
       (log) => log.employeeId === employeeId && log.date === todayStr
@@ -1262,7 +1140,7 @@ export const DataProvider = ({ children }) => {
         return { success: false, message: 'Employee has already punched in for today.' };
       }
 
-      const calc = calculateTimeEntry(timeHHMM, null, 60, settings.defaultShift);
+      const calc = calculateTimeEntry(timeHHMM, null, 60, currentShift);
       const status = calc.lateMinutes > 0 ? 'Late' : 'Present';
 
       const newLog = {
@@ -1284,15 +1162,18 @@ export const DataProvider = ({ children }) => {
         isManual: true,
       };
 
+      let nextLogs;
       if (existingIndex >= 0) {
-        setAttendanceLogs((prev) => {
-          const clone = [...prev];
-          clone[existingIndex] = { ...clone[existingIndex], ...newLog };
-          return clone;
-        });
+        nextLogs = [...attendanceLogs];
+        nextLogs[existingIndex] = { ...nextLogs[existingIndex], ...newLog };
       } else {
-        setAttendanceLogs((prev) => [newLog, ...prev]);
+        nextLogs = [newLog, ...attendanceLogs];
       }
+      attendanceLogsRef.current = nextLogs;
+      setAttendanceLogs(nextLogs);
+      try { localStorage.setItem('reddmart_attendance_logs', JSON.stringify(nextLogs)); } catch (_) {}
+      logAttendanceToSupabase(newLog);
+      try { broadcastDataChanged(); } catch (_) {}
 
       setLiveScanFeed((prev) => [
         {
@@ -1316,7 +1197,7 @@ export const DataProvider = ({ children }) => {
       }
 
       const currentRecord = attendanceLogs[existingIndex];
-      const calc = calculateTimeEntry(currentRecord.timeIn, timeHHMM, currentRecord.breakMinutes || 60, settings.defaultShift);
+      const calc = calculateTimeEntry(currentRecord.timeIn, timeHHMM, currentRecord.breakMinutes || 60, currentShift);
 
       const updatedRecord = {
         ...currentRecord,
@@ -1329,11 +1210,13 @@ export const DataProvider = ({ children }) => {
         remarks: currentRecord.remarks ? `${currentRecord.remarks}, Manual Out` : 'Manual Punch Out',
       };
 
-      setAttendanceLogs((prev) => {
-        const clone = [...prev];
-        clone[existingIndex] = updatedRecord;
-        return clone;
-      });
+      const nextLogs = [...attendanceLogs];
+      nextLogs[existingIndex] = updatedRecord;
+      attendanceLogsRef.current = nextLogs;
+      setAttendanceLogs(nextLogs);
+      try { localStorage.setItem('reddmart_attendance_logs', JSON.stringify(nextLogs)); } catch (_) {}
+      logAttendanceToSupabase(updatedRecord);
+      try { broadcastDataChanged(); } catch (_) {}
 
       setLiveScanFeed((prev) => [
         {
@@ -1358,11 +1241,13 @@ export const DataProvider = ({ children }) => {
     const employee = employees.find((e) => e.id === entryData.employeeId);
     if (!employee) return { success: false, message: 'Employee not found' };
 
+    const currentShift = settingsRef.current?.defaultShift || settings?.defaultShift || { startTime: '08:00', endTime: '17:00', gracePeriodMinutes: 15 };
+
     const calc = calculateTimeEntry(
       entryData.timeIn,
       entryData.timeOut,
       Number(entryData.breakMinutes) || 60,
-      settings.defaultShift
+      currentShift
     );
 
     const newLog = {
@@ -1384,7 +1269,12 @@ export const DataProvider = ({ children }) => {
       isManual: true,
     };
 
-    setAttendanceLogs((prev) => [newLog, ...prev]);
+    const nextLogs = [newLog, ...attendanceLogs];
+    attendanceLogsRef.current = nextLogs;
+    setAttendanceLogs(nextLogs);
+    try { localStorage.setItem('reddmart_attendance_logs', JSON.stringify(nextLogs)); } catch (_) {}
+    logAttendanceToSupabase(newLog);
+    try { broadcastDataChanged(); } catch (_) {}
     return { success: true, log: newLog };
   };
 
@@ -1395,6 +1285,10 @@ export const DataProvider = ({ children }) => {
 
   const updateSettings = (newSettings) => {
     setSettings(newSettings);
+    settingsRef.current = newSettings;
+    try {
+      localStorage.setItem('reddmart_settings', JSON.stringify(newSettings));
+    } catch (e) {}
     return { success: true };
   };
 
@@ -1466,7 +1360,6 @@ export const DataProvider = ({ children }) => {
       const matchUserId = e.userId && String(e.userId) === searchTarget;
       const matchName = e.name && e.name.toLowerCase() === searchTarget;
       const matchToken = e.qrToken && e.qrToken.toLowerCase() === searchTarget;
-      // partial ID match (e.g. EMP-001-01 matches EMP-001-01-BRANCH-001)
       const matchIncludes = e.id && searchTarget.includes(e.id.toLowerCase());
       return matchId || matchEmpCode || matchUserId || matchName || matchToken || matchIncludes;
     });
@@ -1476,7 +1369,6 @@ export const DataProvider = ({ children }) => {
       return { success: false, message: `Employee record (${parsed.employeeId}) not found.` };
     }
 
-    // ── STRICT ONE-TIME SCAN CHECK ──
     const key = `${emp.id}_${selectedMonth}_${cutoffType}`;
     const existing = disbursements[key];
     if (existing?.disbursed) {
@@ -1519,6 +1411,8 @@ export const DataProvider = ({ children }) => {
         settings,
         liveScanFeed,
         disbursements,
+        isLoading,
+        refreshData: () => silentRefreshRef.current?.(),
         markPayrollDisbursed,
         togglePayrollDisbursement,
         disbursePayrollByQR,

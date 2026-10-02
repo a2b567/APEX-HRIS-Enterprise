@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { useBranchScope } from '../../hooks/useBranchScope';
@@ -18,6 +19,7 @@ import {
   Eye,
   CheckCircle2,
   AlertTriangle,
+  ScanLine,
 } from 'lucide-react';
 
 export const QRCodeCenter = () => {
@@ -25,6 +27,7 @@ export const QRCodeCenter = () => {
   const { branches, employees, regenerateEmployeeQR } = useData();
   const branchScope = useBranchScope();
   const { addToast } = useToast();
+  const navigate = useNavigate();
 
   const isSuperAdmin = role === 'SUPER_ADMIN';
   const supervisorBranchId = user?.branchId;
@@ -96,6 +99,14 @@ export const QRCodeCenter = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={() => navigate(isSuperAdmin ? '/admin/scan' : '/supervisor/scan')}
+            className="flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 text-xs font-bold shadow-sm transition"
+          >
+            <ScanLine className="w-4 h-4" />
+            <span>Launch Attendance Scanner</span>
+          </button>
+
           <button
             onClick={handleBulkPrint}
             className="flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 text-xs font-semibold shadow-sm transition"

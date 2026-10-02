@@ -27,7 +27,10 @@ export const EmployeeDashboard = () => {
   const navigate = useNavigate();
   const { addToast } = useToast();
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  })();
   const currentMonth = new Date().toISOString().slice(0, 7);
 
   // Match the logged in employee profile

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/shared/Toast';
@@ -45,7 +45,7 @@ export const SettingsModule = () => {
   };
 
   const [formData, setFormData] = useState({
-    companyName: settings?.companyName || 'REDMART Enterprise',
+    companyName: settings?.companyName || 'REDDMART Enterprise',
     companyTagline: settings?.companyTagline || 'Enterprise Multi-Branch HRIS & Payroll Platform',
     taxIdNumber: '123-456-789-000',
     ...settings,

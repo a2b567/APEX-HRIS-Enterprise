@@ -37,6 +37,7 @@ import {
   FileSpreadsheet,
   CheckCheck,
   X,
+  RefreshCw,
 } from 'lucide-react';
 
 export const EmployeeManagement = () => {
@@ -52,6 +53,8 @@ export const EmployeeManagement = () => {
     regenerateEmployeeQR,
     createEmployeeUser,
     verifyEmployeeId,
+    isLoading,
+    refreshData,
   } = useData();
   const branchScope = useBranchScope();
   const { addToast } = useToast();
@@ -61,6 +64,7 @@ export const EmployeeManagement = () => {
 
   // ── CSV Bulk Import State ──────────────────────────────────────────────
   const csvInputRef = useRef(null);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [importPreview, setImportPreview] = useState([]); // parsed rows
   const [importErrors, setImportErrors] = useState([]);
@@ -559,6 +563,17 @@ export const EmployeeManagement = () => {
             <span>Import CSV</span>
           </button>
 
+          {/* Manual Sync */}
+          <button
+            onClick={async () => { setIsSyncing(true); await refreshData(); setTimeout(() => setIsSyncing(false), 800); }}
+            disabled={isSyncing}
+            title="Force sync from database"
+            className="flex items-center gap-2 rounded-xl bg-slate-700 hover:bg-slate-900 text-white px-4 py-2.5 text-xs font-bold shadow-sm transition disabled:opacity-60"
+          >
+            <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+            <span>{isSyncing ? 'Syncing...' : 'Sync'}</span>
+          </button>
+
           {/* Add Single */}
           <button
             onClick={handleOpenAdd}
@@ -800,7 +815,21 @@ export const EmployeeManagement = () => {
             </tbody>
           </table>
 
-          {filteredEmployees.length === 0 && (
+          {isLoading && (
+            <tbody>
+              {[...Array(4)].map((_, i) => (
+                <tr key={i} className="border-b border-slate-100">
+                  {[...Array(9)].map((__, j) => (
+                    <td key={j} className="px-4 py-3">
+                      <div className="h-3 bg-slate-200 rounded-full animate-pulse" style={{ width: `${60 + Math.random() * 30}%` }} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          )}
+
+          {filteredEmployees.length === 0 && !isLoading && (
             <div className="p-8 text-center text-slate-500 text-xs">
               No employee records match the selected filter.
             </div>

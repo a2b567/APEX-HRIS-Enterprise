@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 
 export const SupervisorManagement = () => {
-  const { branches, users, addSupervisor, updateSupervisor, deleteSupervisor, toggleSupervisorStatus } = useData();
+  const { branches, users, addSupervisor, updateSupervisor, deleteSupervisor, toggleSupervisorStatus, isLoading } = useData();
   const { addToast } = useToast();
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -158,7 +158,29 @@ export const SupervisorManagement = () => {
         </button>
       </div>
 
+      {/* Loading Skeleton */}
+      {isLoading && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="rounded-3xl bg-white border border-slate-200 p-5 shadow-card animate-pulse">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-2xl bg-slate-200" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 bg-slate-200 rounded w-3/4" />
+                  <div className="h-2 bg-slate-100 rounded w-1/2" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="h-2 bg-slate-100 rounded w-full" />
+                <div className="h-2 bg-slate-100 rounded w-4/5" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Supervisors Grid */}
+      {!isLoading && (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {supervisors.map((sup) => {
           const assignedBranch = branches.find((b) => b.id === sup.branchId);
@@ -262,6 +284,7 @@ export const SupervisorManagement = () => {
           );
         })}
       </div>
+      )} {/* end !isLoading */}
 
       {/* Create / Edit Modal */}
       {modalOpen && (

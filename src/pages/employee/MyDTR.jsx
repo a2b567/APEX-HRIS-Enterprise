@@ -18,7 +18,10 @@ export const MyDTR = () => {
     return employees.find((e) => e.userId === user?.id || e.id === user?.employeeId) || employees[0];
   }, [employees, user]);
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  })();
 
   const todayLog = useMemo(() => {
     return attendanceLogs.find((l) => l.employeeId === employee?.id && l.date === todayStr);

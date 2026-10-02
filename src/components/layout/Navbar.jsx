@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
@@ -91,7 +91,7 @@ export const Navbar = ({ sidebarOpen, setSidebarOpen }) => {
       // Admin / Supervisor notifications
       list.push({
         id: 'system_ready',
-        title: '⚡ REDMART Enterprise System Online',
+        title: '⚡ REDDMART Enterprise System Online',
         message: 'Database & real-time telemetry services active.',
         timestamp: new Date().toISOString(),
         type: 'info',

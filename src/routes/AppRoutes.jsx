@@ -95,6 +95,14 @@ export const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="admin/scan"
+          element={
+            <ProtectedRoute allowedRoles={['SUPER_ADMIN']}>
+              <ScanQRPage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* ========================================================================= */}
         {/* SUPERVISOR DEDICATED ROUTES (SCOPED STRICTLY TO 1 BRANCH)                */}
@@ -103,7 +111,7 @@ export const AppRoutes = () => {
         <Route
           path="supervisor/dashboard"
           element={
-            <ProtectedRoute allowedRoles={['SUPERVISOR']}>
+            <ProtectedRoute allowedRoles={['SUPERVISOR', 'SUPER_ADMIN']}>
               <SupervisorDashboard />
             </ProtectedRoute>
           }
@@ -111,7 +119,7 @@ export const AppRoutes = () => {
         <Route
           path="supervisor/scan"
           element={
-            <ProtectedRoute allowedRoles={['SUPERVISOR']}>
+            <ProtectedRoute allowedRoles={['SUPERVISOR', 'SUPER_ADMIN']}>
               <ScanQRPage />
             </ProtectedRoute>
           }

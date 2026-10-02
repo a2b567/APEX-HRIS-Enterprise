@@ -5,8 +5,13 @@
  * - Overtime: hours beyond 8 hours or work after scheduled end time (17:00)
  */
 
-export const calculateTimeEntry = (timeIn, timeOut, breakMinutes = 60, shift = { startTime: '08:00', endTime: '17:00', gracePeriodMinutes: 15 }) => {
-  if (!timeIn || !timeOut) {
+export const calculateTimeEntry = (
+  timeIn,
+  timeOut,
+  breakMinutes = 60,
+  shift = { startTime: '08:00', endTime: '17:00', gracePeriodMinutes: 15 }
+) => {
+  if (!timeIn && !timeOut) {
     return {
       regularHours: 0,
       overtimeHours: 0,
@@ -16,25 +21,42 @@ export const calculateTimeEntry = (timeIn, timeOut, breakMinutes = 60, shift = {
     };
   }
 
-  const [inH, inM] = timeIn.split(':').map(Number);
-  const [outH, outM] = timeOut.split(':').map(Number);
-  const [shiftStartH, shiftStartM] = shift.startTime.split(':').map(Number);
-  const [shiftEndH, shiftEndM] = shift.endTime.split(':').map(Number);
+  const shiftStart = shift?.startTime || '08:00';
+  const shiftEnd = shift?.endTime || '17:00';
+  const grace = shift?.gracePeriodMinutes !== undefined ? shift.gracePeriodMinutes : 15;
 
-  const inMinutes = inH * 60 + inM;
-  const outMinutes = outH * 60 + outM;
+  const [shiftStartH, shiftStartM] = shiftStart.split(':').map(Number);
+  const [shiftEndH, shiftEndM] = shiftEnd.split(':').map(Number);
   const shiftStartMinutes = shiftStartH * 60 + shiftStartM;
   const shiftEndMinutes = shiftEndH * 60 + shiftEndM;
 
+  let lateMinutes = 0;
+  let inMinutes = 0;
+
+  if (timeIn) {
+    const [inH, inM] = timeIn.split(':').map(Number);
+    inMinutes = inH * 60 + inM;
+    if (inMinutes > shiftStartMinutes + grace) {
+      lateMinutes = inMinutes - shiftStartMinutes;
+    }
+  }
+
+  // When only Time In is logged (employee is currently punched in for the day)
+  if (!timeOut) {
+    return {
+      regularHours: 0,
+      overtimeHours: 0,
+      lateMinutes,
+      undertimeMinutes: 0,
+      status: lateMinutes > 0 ? 'Late' : 'Present',
+    };
+  }
+
+  const [outH, outM] = timeOut.split(':').map(Number);
+  const outMinutes = outH * 60 + outM;
+
   let totalWorkedMinutes = Math.max(0, outMinutes - inMinutes - breakMinutes);
   if (totalWorkedMinutes < 0) totalWorkedMinutes = 0;
-
-  // Check Lateness
-  let lateMinutes = 0;
-  if (inMinutes > shiftStartMinutes + shift.gracePeriodMinutes) {
-    // If past grace period, penalty is counted from actual shift start
-    lateMinutes = inMinutes - shiftStartMinutes;
-  }
 
   // Check Undertime
   let undertimeMinutes = 0;
@@ -42,7 +64,7 @@ export const calculateTimeEntry = (timeIn, timeOut, breakMinutes = 60, shift = {
     undertimeMinutes = shiftEndMinutes - outMinutes;
   }
 
-  // Check Overtime (after 17:00)
+  // Check Overtime (after scheduled shift end)
   let overtimeMinutes = 0;
   if (outMinutes > shiftEndMinutes) {
     overtimeMinutes = outMinutes - shiftEndMinutes;

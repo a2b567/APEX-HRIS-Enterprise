@@ -32,6 +32,7 @@ export const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
     if (role === 'SUPER_ADMIN') {
       return [
         { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
+        { name: 'Scan Attendance', path: '/admin/scan', icon: ScanLine, highlight: true },
         { name: 'Branches', path: '/admin/branches', icon: Building2 },
         { name: 'Supervisors', path: '/admin/supervisors', icon: ShieldCheck },
         { name: 'Employees', path: '/admin/employees', icon: Users },
@@ -87,7 +88,7 @@ export const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
             </div>
             <div>
               <h1 className="text-base font-black tracking-tight text-white leading-tight">
-                REDMART
+                REDDMART
               </h1>
               <p className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">
                 Enterprise Platform
