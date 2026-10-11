@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { useClock } from '../../hooks/useClock';
 import { formatDate, formatTime, formatHours, getStatusBadge } from '../../utils/formatters';
-import { Clock, Calendar, Download, Printer, Filter } from 'lucide-react';
+import { Clock, Calendar, Download, Printer, Filter, FileCheck2 } from 'lucide-react';
 import { useToast } from '../../components/shared/Toast';
 
 export const MyDTR = () => {
@@ -11,6 +12,7 @@ export const MyDTR = () => {
   const { employees, attendanceLogs, recordPunch } = useData();
   const { formattedTime, formattedDate } = useClock();
   const { addToast } = useToast();
+  const navigate = useNavigate();
 
   const [monthFilter, setMonthFilter] = useState(new Date().toISOString().slice(0, 7));
 
@@ -67,6 +69,13 @@ export const MyDTR = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate('/employee/corrections')}
+            className="flex items-center gap-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 px-4 py-2 text-xs font-semibold shadow-xs transition"
+          >
+            <FileCheck2 className="w-4 h-4 text-amber-700" />
+            <span>Request Correction</span>
+          </button>
           <button
             onClick={handlePrint}
             className="flex items-center gap-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 py-2 text-xs font-semibold shadow-sm transition"

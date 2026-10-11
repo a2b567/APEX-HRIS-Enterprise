@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
@@ -19,23 +19,46 @@ import {
   ScanLine,
   LogOut,
   Code,
+  CalendarDays,
+  FileCheck2,
 } from 'lucide-react';
 
 export const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
   const { role, user, logout } = useAuth();
-  const { branches } = useData();
+  const { branches, attendanceCorrections, employees } = useData();
   const location = useLocation();
 
   const userBranch = branches.find((b) => b.id === user?.branchId);
+  const currentEmployee = employees.find((e) => e.userId === user?.id || e.id === user?.employeeId);
+
+  // Compute pending correction count for badge
+  const pendingCorrectionsCount = useMemo(() => {
+    return (attendanceCorrections || []).filter((r) => {
+      if (role === 'EMPLOYEE') {
+        return r.employeeId === (currentEmployee?.id || user?.employeeId) && r.status === 'PENDING';
+      }
+      if (role === 'SUPERVISOR') {
+        return r.branchId === user?.branchId && r.status === 'PENDING';
+      }
+      return r.status === 'PENDING';
+    }).length;
+  }, [attendanceCorrections, role, user, currentEmployee]);
 
   const getNavItems = () => {
     if (role === 'SUPER_ADMIN') {
       return [
         { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
         { name: 'Scan Attendance', path: '/admin/scan', icon: ScanLine, highlight: true },
-        { name: 'Branches', path: '/admin/branches', icon: Building2 },
+        { name: 'Branches (5)', path: '/admin/branches', icon: Building2 },
         { name: 'Supervisors', path: '/admin/supervisors', icon: ShieldCheck },
         { name: 'Employees', path: '/admin/employees', icon: Users },
+        { name: 'Shift Schedules', path: '/admin/shifts', icon: CalendarDays },
+        {
+          name: 'Correction Requests',
+          path: '/admin/corrections',
+          icon: FileCheck2,
+          badge: pendingCorrectionsCount > 0 ? pendingCorrectionsCount : null,
+        },
         { name: 'QR Badge Center', path: '/admin/qr-codes', icon: QrCode },
         { name: 'Daily Time Record', path: '/dtr', icon: Clock },
         { name: 'Payroll Run', path: '/payroll', icon: Banknote },
@@ -48,6 +71,13 @@ export const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
         { name: 'Scan Attendance', path: '/supervisor/scan', icon: ScanLine, highlight: true },
         { name: 'QR Badge Center', path: '/supervisor/qr-codes', icon: QrCode },
         { name: 'Branch Employees', path: '/supervisor/employees', icon: Users },
+        { name: 'Shift Schedules', path: '/supervisor/shifts', icon: CalendarDays },
+        {
+          name: 'Correction Requests',
+          path: '/supervisor/corrections',
+          icon: FileCheck2,
+          badge: pendingCorrectionsCount > 0 ? pendingCorrectionsCount : null,
+        },
         { name: 'Daily Time Record', path: '/supervisor/dtr', icon: Clock },
         { name: 'Branch Payroll', path: '/supervisor/payroll', icon: Banknote },
         { name: 'Reports', path: '/supervisor/reports', icon: BarChart3 },
@@ -58,6 +88,13 @@ export const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
       return [
         { name: 'My Profile', path: '/employee/dashboard', icon: User },
         { name: 'My QR Badge', path: '/employee/qr', icon: QrCode },
+        { name: 'My Shift Schedule', path: '/employee/schedule', icon: CalendarDays },
+        {
+          name: 'Correction Requests',
+          path: '/employee/corrections',
+          icon: FileCheck2,
+          badge: pendingCorrectionsCount > 0 ? pendingCorrectionsCount : null,
+        },
         { name: 'My Attendance', path: '/employee/dtr', icon: Clock },
         { name: 'My Payslips', path: '/employee/payslips', icon: FileText },
         { name: 'Settings', path: '/settings', icon: Settings },
@@ -88,10 +125,10 @@ export const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
             </div>
             <div>
               <h1 className="text-base font-black tracking-tight text-white leading-tight">
-                REDDMART
+                REDMART
               </h1>
               <p className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">
-                Enterprise Platform
+                Timekeeping & Payroll
               </p>
             </div>
           </div>
@@ -148,7 +185,7 @@ export const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                 </div>
                 {item.badge && (
                   <span
-                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${isActive ? 'bg-white/20 text-white' : 'bg-navy-700 text-slate-300'
+                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${isActive ? 'bg-white text-blue-700' : 'bg-amber-400 text-slate-950 font-black shadow-xs'
                       }`}
                   >
                     {item.badge}

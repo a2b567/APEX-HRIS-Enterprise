@@ -21,6 +21,8 @@ import {
   Trash2,
   QrCode,
   FileSpreadsheet,
+  CalendarDays,
+  FileCheck2,
 } from 'lucide-react';
 
 export const DTRModule = () => {
@@ -216,6 +218,22 @@ export const DTRModule = () => {
               <span>Scan QR</span>
             </button>
           )}
+
+          <button
+            onClick={() => navigate('/shifts')}
+            className="flex items-center gap-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-3.5 py-2 text-xs font-semibold shadow-xs transition"
+          >
+            <CalendarDays className="w-4 h-4 text-blue-600" />
+            <span>Shift Schedules</span>
+          </button>
+
+          <button
+            onClick={() => navigate('/corrections')}
+            className="flex items-center gap-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 px-3.5 py-2 text-xs font-semibold shadow-xs transition"
+          >
+            <FileCheck2 className="w-4 h-4 text-amber-600" />
+            <span>Correction Requests</span>
+          </button>
 
           {!isEmployee && (
             <button

@@ -4,6 +4,9 @@ import {
   INITIAL_USERS,
   INITIAL_EMPLOYEES,
   INITIAL_SETTINGS,
+  INITIAL_SHIFTS,
+  INITIAL_SCHEDULES,
+  INITIAL_CORRECTIONS,
   generateInitialAttendanceLogs,
 } from '../data/mockData';
 import { calculateTimeEntry } from '../utils/dtrCalculator';
@@ -63,6 +66,36 @@ export const DataProvider = ({ children }) => {
   }, [settings]);
 
   const [liveScanFeed, setLiveScanFeed] = useState([]);
+
+  // Shift Scheduling & Work Hours
+  const [shiftTemplates, setShiftTemplates] = useState(() => {
+    try {
+      const saved = localStorage.getItem('redmart_shift_templates');
+      return saved ? JSON.parse(saved) : INITIAL_SHIFTS;
+    } catch {
+      return INITIAL_SHIFTS;
+    }
+  });
+
+  // Employee Assigned Schedules (Work Schedules, Shifts & Rest Days)
+  const [schedules, setSchedules] = useState(() => {
+    try {
+      const saved = localStorage.getItem('redmart_schedules');
+      return saved ? JSON.parse(saved) : INITIAL_SCHEDULES;
+    } catch {
+      return INITIAL_SCHEDULES;
+    }
+  });
+
+  // Attendance Correction Requests (Missed Time-In / Time-Out for Approval)
+  const [attendanceCorrections, setAttendanceCorrections] = useState(() => {
+    try {
+      const saved = localStorage.getItem('redmart_corrections');
+      return saved ? JSON.parse(saved) : INITIAL_CORRECTIONS;
+    } catch {
+      return INITIAL_CORRECTIONS;
+    }
+  });
 
   // Stable ref to silentRefresh so it can be called from outside the useEffect
   const silentRefreshRef = useRef(null);
@@ -149,6 +182,14 @@ export const DataProvider = ({ children }) => {
     setAttendanceLogs(generateInitialAttendanceLogs());
     setSettings(INITIAL_SETTINGS);
     setLiveScanFeed([]);
+    setShiftTemplates(INITIAL_SHIFTS);
+    setSchedules(INITIAL_SCHEDULES);
+    setAttendanceCorrections(INITIAL_CORRECTIONS);
+    try {
+      localStorage.removeItem('redmart_shift_templates');
+      localStorage.removeItem('redmart_schedules');
+      localStorage.removeItem('redmart_corrections');
+    } catch (_) {}
   };
 
   /**
@@ -1400,6 +1441,200 @@ export const DataProvider = ({ children }) => {
     return disbursements[key] || { disbursed: false };
   };
 
+  // ── Shift Scheduling Functions ──
+  const saveShiftTemplate = (shiftData) => {
+    setShiftTemplates((prev) => {
+      const existingIdx = prev.findIndex((s) => s.id === shiftData.id);
+      let next;
+      if (existingIdx >= 0) {
+        next = [...prev];
+        next[existingIdx] = shiftData;
+      } else {
+        next = [...prev, shiftData];
+      }
+      try { localStorage.setItem('redmart_shift_templates', JSON.stringify(next)); } catch (_) {}
+      return next;
+    });
+    return { success: true, message: 'Shift template saved successfully.' };
+  };
+
+  const deleteShiftTemplate = (shiftId) => {
+    setShiftTemplates((prev) => {
+      const next = prev.filter((s) => s.id !== shiftId);
+      try { localStorage.setItem('redmart_shift_templates', JSON.stringify(next)); } catch (_) {}
+      return next;
+    });
+    return { success: true, message: 'Shift template deleted.' };
+  };
+
+  const assignEmployeeSchedule = (schedData) => {
+    setSchedules((prev) => {
+      const existingIdx = prev.findIndex((s) => s.employeeId === schedData.employeeId);
+      const newEntry = {
+        id: schedData.id || `SCHED-${schedData.employeeId}`,
+        updatedAt: new Date().toISOString(),
+        ...schedData,
+      };
+      let next;
+      if (existingIdx >= 0) {
+        next = [...prev];
+        next[existingIdx] = newEntry;
+      } else {
+        next = [newEntry, ...prev];
+      }
+      try { localStorage.setItem('redmart_schedules', JSON.stringify(next)); } catch (_) {}
+      return next;
+    });
+    return { success: true, message: 'Work schedule & rest days successfully assigned!' };
+  };
+
+  const deleteEmployeeSchedule = (employeeId) => {
+    setSchedules((prev) => {
+      const next = prev.filter((s) => s.employeeId !== employeeId);
+      try { localStorage.setItem('redmart_schedules', JSON.stringify(next)); } catch (_) {}
+      return next;
+    });
+    return { success: true, message: 'Schedule assignment removed.' };
+  };
+
+  const getEmployeeSchedule = (employeeId) => {
+    const found = schedules.find((s) => s.employeeId === employeeId);
+    if (found) return found;
+    const defShift = settings?.defaultShift || { startTime: '08:00', endTime: '17:00', gracePeriodMinutes: 15 };
+    return {
+      employeeId,
+      shiftId: 'SHIFT-REGULAR',
+      shiftName: 'Standard Day Shift',
+      startTime: defShift.startTime || '08:00',
+      endTime: defShift.endTime || '17:00',
+      breakMinutes: 60,
+      gracePeriodMinutes: defShift.gracePeriodMinutes || 15,
+      restDays: ['Sunday'],
+      notes: 'Standard 8-hour shift',
+    };
+  };
+
+  // ── Attendance Correction Functions ──
+  const submitAttendanceCorrection = (requestData) => {
+    const newReq = {
+      id: `CORR-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      createdAt: new Date().toISOString(),
+      status: 'PENDING',
+      ...requestData,
+    };
+    setAttendanceCorrections((prev) => {
+      const next = [newReq, ...prev];
+      try { localStorage.setItem('redmart_corrections', JSON.stringify(next)); } catch (_) {}
+      return next;
+    });
+    return { success: true, message: 'Attendance correction request submitted for approval!' };
+  };
+
+  const approveAttendanceCorrection = (requestId, reviewerName = 'Supervisor') => {
+    const targetReq = attendanceCorrections.find((r) => r.id === requestId);
+    if (!targetReq) return { success: false, message: 'Correction request not found.' };
+
+    const emp = employees.find((e) => e.id === targetReq.employeeId);
+    const empSched = getEmployeeSchedule(targetReq.employeeId);
+    const shift = {
+      startTime: empSched?.startTime || '08:00',
+      endTime: empSched?.endTime || '17:00',
+      gracePeriodMinutes: empSched?.gracePeriodMinutes || 15,
+    };
+
+    const targetDate = targetReq.date;
+    const existingLog = attendanceLogs.find((l) => l.employeeId === targetReq.employeeId && l.date === targetDate);
+
+    const effectiveTimeIn = targetReq.requestedTimeIn || existingLog?.timeIn || '08:00';
+    const effectiveTimeOut = targetReq.requestedTimeOut || existingLog?.timeOut || '17:00';
+
+    const calc = calculateTimeEntry(effectiveTimeIn, effectiveTimeOut, 60, shift);
+
+    const updatedLog = {
+      id: existingLog?.id || `ATT-${targetReq.employeeId}-${targetDate}`,
+      employeeId: targetReq.employeeId,
+      employeeName: targetReq.employeeName || emp?.name || targetReq.employeeId,
+      branchId: targetReq.branchId || emp?.branchId,
+      date: targetDate,
+      timeIn: effectiveTimeIn,
+      timeOut: effectiveTimeOut,
+      breakMinutes: 60,
+      regularHours: calc.regularHours,
+      overtimeHours: calc.overtimeHours,
+      lateMinutes: calc.lateMinutes,
+      undertimeMinutes: calc.undertimeMinutes,
+      status: calc.status,
+      method: 'MANUAL',
+      remarks: `Approved Correction (${targetReq.reason || 'Missed Punch'}) by ${reviewerName}`,
+      isManual: true,
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Update attendance logs
+    setAttendanceLogs((prev) => {
+      const idx = prev.findIndex((l) => l.employeeId === targetReq.employeeId && l.date === targetDate);
+      let nextLogs;
+      if (idx >= 0) {
+        nextLogs = [...prev];
+        nextLogs[idx] = updatedLog;
+      } else {
+        nextLogs = [updatedLog, ...prev];
+      }
+      try { localStorage.setItem('reddmart_attendance_logs', JSON.stringify(nextLogs)); } catch (_) {}
+      return nextLogs;
+    });
+
+    if (isSupabaseConfigured()) {
+      logAttendanceToSupabase(updatedLog).catch(() => {});
+    }
+
+    // Mark request as APPROVED
+    setAttendanceCorrections((prev) => {
+      const next = prev.map((r) =>
+        r.id === requestId
+          ? {
+              ...r,
+              status: 'APPROVED',
+              reviewedBy: reviewerName,
+              reviewedAt: new Date().toISOString(),
+            }
+          : r
+      );
+      try { localStorage.setItem('redmart_corrections', JSON.stringify(next)); } catch (_) {}
+      return next;
+    });
+
+    return { success: true, message: `Correction request approved and DTR log updated for ${targetDate}.` };
+  };
+
+  const rejectAttendanceCorrection = (requestId, reviewerName = 'Supervisor', reviewNote = '') => {
+    setAttendanceCorrections((prev) => {
+      const next = prev.map((r) =>
+        r.id === requestId
+          ? {
+              ...r,
+              status: 'REJECTED',
+              reviewedBy: reviewerName,
+              reviewedAt: new Date().toISOString(),
+              reviewNote: reviewNote || 'Correction request rejected by approver',
+            }
+          : r
+      );
+      try { localStorage.setItem('redmart_corrections', JSON.stringify(next)); } catch (_) {}
+      return next;
+    });
+    return { success: true, message: 'Attendance correction request rejected.' };
+  };
+
+  const deleteAttendanceCorrection = (requestId) => {
+    setAttendanceCorrections((prev) => {
+      const next = prev.filter((r) => r.id !== requestId);
+      try { localStorage.setItem('redmart_corrections', JSON.stringify(next)); } catch (_) {}
+      return next;
+    });
+    return { success: true, message: 'Correction request deleted.' };
+  };
+
   return (
     <DataContext.Provider
       value={{
@@ -1411,6 +1646,9 @@ export const DataProvider = ({ children }) => {
         settings,
         liveScanFeed,
         disbursements,
+        shiftTemplates,
+        schedules,
+        attendanceCorrections,
         isLoading,
         refreshData: () => silentRefreshRef.current?.(),
         markPayrollDisbursed,
@@ -1440,6 +1678,15 @@ export const DataProvider = ({ children }) => {
         updateSettings,
         updateUserAccount,
         resetToFactoryDefaults,
+        saveShiftTemplate,
+        deleteShiftTemplate,
+        assignEmployeeSchedule,
+        deleteEmployeeSchedule,
+        getEmployeeSchedule,
+        submitAttendanceCorrection,
+        approveAttendanceCorrection,
+        rejectAttendanceCorrection,
+        deleteAttendanceCorrection,
       }}
     >
       {children}

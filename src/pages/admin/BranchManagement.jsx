@@ -57,6 +57,7 @@ export const BranchManagement = () => {
 
   // Delete Branch state
   const [deleteConfirmBranch, setDeleteConfirmBranch] = useState(null);
+  
 
   const supervisors = users.filter((u) => u.role === 'SUPERVISOR');
   const todayStr = (() => {
@@ -179,15 +180,15 @@ export const BranchManagement = () => {
         <div>
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200">
-              Governance Matrix
+              Multi-Branch Matrix
             </span>
-            <span className="text-xs text-slate-500 font-medium">Multi-Branch Management</span>
+            <span className="text-xs text-slate-500 font-medium">Centrally Managing 5 RedMart Branches</span>
           </div>
           <h1 className="mt-1 text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-            Branch Management
+            Multi-Branch Management
           </h1>
           <p className="text-xs text-slate-500">
-            Enterprise multi-site administration and supervisor alignment. Add, edit, or remove branches.
+            Centralized administration and supervisor alignment for 5 RedMart grocery branches. Oversee staff, rosters, and branch status.
           </p>
         </div>
 

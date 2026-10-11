@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import {
   Clock,
   ShieldCheck,
-  Briefcase,
   User,
   Mail,
   Lock,
@@ -20,25 +19,31 @@ import {
   Building2,
   CheckCircle2,
   Code,
+  Briefcase,
+  ExternalLink,
 } from 'lucide-react';
 import { useToast } from '../../components/shared/Toast';
 import TermsModal from '../../components/shared/TermsModal';
 import { validateIdDocument } from '../../utils/idValidator';
+import RecaptchaWidget from '../../components/shared/RecaptchaWidget';
 
 export const LoginPage = () => {
   // Mode: 'SIGN_IN' | 'REGISTER'
   const [authMode, setAuthMode] = useState('SIGN_IN');
 
-  // Role switcher: 'ADMIN' | 'PAYROLL' | 'EMPLOYEE'
-  const [selectedRole, setSelectedRole] = useState('ADMIN');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  // Employee Self-Service credentials
+  const [email, setEmail] = useState('juan.cruz');
+  const [password, setPassword] = useState('EMP-001-01');
   const [showPassword, setShowPassword] = useState(false);
   const [trustDevice, setTrustDevice] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(true);
+
+  // Google reCAPTCHA Enterprise Verification State
+  const [recaptchaVerified, setRecaptchaVerified] = useState(false);
+  const [recaptchaError, setRecaptchaError] = useState('');
 
   // Registration form state for employee
   const [regForm, setRegForm] = useState({
@@ -58,56 +63,50 @@ export const LoginPage = () => {
   const [idValidating, setIdValidating] = useState(false);
   const [idValidationError, setIdValidationError] = useState('');
 
-  const { login, loginUserDirectly, loading } = useAuth();
+  const { login, loading } = useAuth();
   const { registerEmployeeAccount, branches } = useData();
   const navigate = useNavigate();
   const { addToast } = useToast();
 
-  const roleConfigs = [
-    {
-      id: 'ADMIN',
-      title: 'Admin',
-      subtitle: 'Full system access',
-      icon: ShieldCheck,
-      defaultUser: 'admin',
-      defaultPass: 'Admin@123',
-    },
-    {
-      id: 'SUPERVISOR',
-      title: 'Supervisor',
-      subtitle: 'Branch management',
-      icon: Briefcase,
-      defaultUser: 'supervisor1',
-      defaultPass: 'Sup@123',
-    },
-    {
-      id: 'EMPLOYEE',
-      title: 'Employee',
-      subtitle: 'Self-service portal',
-      icon: User,
-      defaultUser: 'employee1',
-      defaultPass: 'Emp@123',
-    },
-  ];
-
-  const handleRoleSelect = (roleId) => {
-    setSelectedRole(roleId);
-    setErrorMessage('');
-  };
-
   const handleLogin = async (e) => {
     e.preventDefault();
     setErrorMessage('');
+    setRecaptchaError('');
+
+    const cleanInput = email.trim().toLowerCase();
+
+    // Security guard: Prevent administrative & supervisor logins here - redirect them to Management Gateway
+    if (cleanInput === 'admin') {
+      setErrorMessage(
+        'Security Protocol: Administrator accounts must sign in via the Management & Administrative Gateway.'
+      );
+      return;
+    }
+    if (cleanInput === 'aron' || cleanInput.includes('supervisor')) {
+      setErrorMessage(
+        'Security Protocol: Branch Supervisor accounts must sign in via the Management & Administrative Gateway.'
+      );
+      return;
+    }
+
+    if (!recaptchaVerified) {
+      setRecaptchaError('Please check "I\'m not a robot" to complete security verification.');
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const result = await login(email, password, selectedRole);
+      // Employee portal strictly enforces EMPLOYEE role
+      const result = await login(email, password, 'EMPLOYEE');
       if (result.success) {
-        const role = result.user?.role;
-        if (role === 'SUPER_ADMIN') navigate('/dashboard');
-        else if (role === 'SUPERVISOR') navigate('/supervisor/dashboard');
-        else navigate('/employee/dashboard');
+        addToast({
+          title: 'Welcome Back',
+          message: `Signed in as ${result.user?.name || 'Employee'}. Accessing Employee Portal.`,
+          type: 'success',
+        });
+        navigate('/employee/dashboard');
       } else {
-        setErrorMessage(result.message || 'Login failed. Check your credentials.');
+        setErrorMessage(result.message || 'Login failed. Check your employee credentials.');
       }
     } catch (err) {
       setErrorMessage(err.message || 'An unexpected error occurred.');
@@ -156,14 +155,12 @@ export const LoginPage = () => {
       setIdValidationError('Failed to validate ID document. Please try another clear photo.');
     } finally {
       setIdValidating(false);
-      // Reset input value so user can re-upload if needed
       e.target.value = '';
     }
   };
 
   const handleUseSampleId = () => {
     setIdValidationError('');
-    // Generate a clean SVG sample ID badge
     const sampleCanvas = document.createElement('canvas');
     sampleCanvas.width = 400;
     sampleCanvas.height = 250;
@@ -231,39 +228,43 @@ export const LoginPage = () => {
       return;
     }
 
+    if (!recaptchaVerified) {
+      setRecaptchaError('Please check "I\'m not a robot" before creating your account.');
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const res = registerEmployeeAccount(regForm);
-      if (res.success && res.user) {
+      const res = await registerEmployeeAccount(regForm);
+      if (res.success) {
         addToast({
-          title: 'ID Verified & Account Created',
-          message: res.message || `Welcome to REDDMART Enterprise, ${res.user.name}! ID confirmed.`,
+          title: 'Account Created & ID Verified!',
+          message: `Welcome, ${regForm.name}! Your Employee ID is ${res.employee?.employeeCode || res.employee?.id}.`,
           type: 'success',
         });
-        loginUserDirectly(res.user);
-        navigate('/employee/dashboard');
+        setEmail(regForm.username);
+        setPassword(regForm.password);
+        setAuthMode('SIGN_IN');
       } else {
-        setErrorMessage(res.message || 'Unable to complete registration.');
+        setErrorMessage(res.message || 'Registration failed. Try again.');
       }
     } catch (err) {
-      setErrorMessage(err.message || 'Registration failed.');
+      setErrorMessage(err.message || 'An error occurred during registration.');
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col lg:flex-row bg-[#F4F6FA] font-sans antialiased selection:bg-blue-600 selection:text-white">
-      
+    <div className="min-h-screen w-full flex flex-col lg:flex-row bg-[#060c18] font-sans antialiased text-slate-100 selection:bg-blue-600 selection:text-white">
       {/* ─────────────────────────────────────────────────────────────
           LEFT COLUMN: Deep Navy Brand Panel (#081226)
          ───────────────────────────────────────────────────────────── */}
-      <div className="w-full lg:w-[48%] xl:w-[45%] bg-[#081226] text-white p-8 sm:p-12 lg:p-16 flex flex-col justify-between relative overflow-hidden shrink-0">
-        
+      <div className="w-full lg:w-[48%] xl:w-[45%] bg-[#081226] text-white p-8 sm:p-12 lg:p-16 flex flex-col justify-between relative overflow-hidden shrink-0 border-b lg:border-b-0 lg:border-r border-slate-800/80">
         {/* Subtle Decorative Curved Radial Blobs */}
-        <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full bg-[#162a56]/60 blur-3xl pointer-events-none" />
-        <div className="absolute top-1/4 -right-16 w-80 h-80 rounded-full bg-[#0d3b66]/30 blur-2xl pointer-events-none" />
-        <div className="absolute -bottom-24 -left-24 w-80 h-80 rounded-full bg-[#1e3a8a]/20 blur-3xl pointer-events-none" />
+        <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full bg-blue-600/20 blur-3xl pointer-events-none" />
+        <div className="absolute top-1/4 -right-16 w-80 h-80 rounded-full bg-indigo-600/15 blur-2xl pointer-events-none" />
+        <div className="absolute -bottom-24 -left-24 w-80 h-80 rounded-full bg-blue-700/20 blur-3xl pointer-events-none" />
 
         {/* Top: Brand Header */}
         <div className="relative z-10">
@@ -273,10 +274,10 @@ export const LoginPage = () => {
             </div>
             <div>
               <h2 className="text-[17px] font-bold tracking-tight text-white leading-snug">
-                REDDMART Enterprise
+                REDMART
               </h2>
               <p className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">
-                HUMAN RESOURCE INFORMATION SYSTEM
+                Multi-Branch Digital Timekeeping &amp; Payroll System
               </p>
             </div>
           </div>
@@ -344,28 +345,34 @@ export const LoginPage = () => {
       </div>
 
       {/* ─────────────────────────────────────────────────────────────
-          RIGHT COLUMN: Clean White Auth Card Container (#F4F6FA)
+          RIGHT COLUMN: Sleek Dark Auth Card Container (#060c18)
          ───────────────────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col justify-between p-6 sm:p-10 lg:p-12 xl:p-16 overflow-y-auto">
-        
-        {/* Top Quick Actions (Kiosk Mode & Fast Switch) */}
-        <div className="flex justify-end items-center gap-3 mb-4">
+      <div className="flex-1 flex flex-col justify-between p-6 sm:p-10 lg:p-12 xl:p-16 overflow-y-auto bg-[#060c18]">
+        {/* Top Quick Actions (Kiosk Mode & Admin/Supervisor Link) */}
+        <div className="flex justify-between items-center gap-3 mb-4">
+          <Link
+            to="/admin/login"
+            className="px-3.5 py-1.5 text-xs font-semibold text-blue-400 hover:text-blue-300 bg-[#0b1528] hover:bg-[#111e38] border border-slate-800/80 rounded-xl shadow-sm transition flex items-center gap-1.5"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
+            <span>Management &amp; Admin Gateway →</span>
+          </Link>
+
           <button
             type="button"
             onClick={() => navigate('/kiosk')}
-            className="px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-blue-600 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl shadow-sm transition flex items-center gap-1.5"
+            className="px-3.5 py-1.5 text-xs font-semibold text-slate-300 hover:text-white bg-[#0b1528] hover:bg-[#111e38] border border-slate-800/80 rounded-xl shadow-sm transition flex items-center gap-1.5"
           >
-            <Maximize2 className="w-3.5 h-3.5 text-blue-600" />
+            <Maximize2 className="w-3.5 h-3.5 text-blue-400" />
             <span>Kiosk Mode</span>
           </button>
         </div>
 
         {/* Center Card Container */}
         <div className="w-full max-w-[520px] mx-auto my-auto">
-          <div className="bg-white rounded-[28px] shadow-[0_12px_40px_-10px_rgba(0,0,0,0.08)] border border-slate-100 p-7 sm:p-9 space-y-5">
-            
+          <div className="bg-[#0b1528] rounded-3xl shadow-2xl border border-slate-800/90 p-7 sm:p-9 space-y-5 backdrop-blur-md">
             {/* Mode Switcher Tabs */}
-            <div className="flex bg-slate-100/90 p-1 rounded-2xl">
+            <div className="flex bg-[#081226] p-1 rounded-2xl border border-slate-800/80">
               <button
                 type="button"
                 onClick={() => {
@@ -374,11 +381,11 @@ export const LoginPage = () => {
                 }}
                 className={`flex-1 py-2 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 ${
                   authMode === 'SIGN_IN'
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-900'
+                    ? 'bg-blue-600/30 text-blue-300 border border-blue-500/40 shadow-sm'
+                    : 'text-slate-400 hover:text-white'
                 }`}
               >
-                <LogIn className="w-3.5 h-3.5 text-blue-600" />
+                <LogIn className="w-3.5 h-3.5 text-blue-400" />
                 <span>Sign In</span>
               </button>
               <button
@@ -389,20 +396,32 @@ export const LoginPage = () => {
                 }}
                 className={`flex-1 py-2 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 ${
                   authMode === 'REGISTER'
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-900'
+                    ? 'bg-blue-600/30 text-blue-300 border border-blue-500/40 shadow-sm'
+                    : 'text-slate-400 hover:text-white'
                 }`}
               >
-                <UserPlus className="w-3.5 h-3.5 text-blue-600" />
+                <UserPlus className="w-3.5 h-3.5 text-blue-400" />
                 <span>Create Employee Account</span>
               </button>
             </div>
 
             {/* Error Alert */}
             {errorMessage && (
-              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-medium flex items-center gap-2">
-                <ShieldAlert className="w-4 h-4 shrink-0 text-rose-600" />
-                <span>{errorMessage}</span>
+              <div className="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs rounded-xl font-medium flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 shrink-0 text-rose-400" />
+                <div className="flex-1">
+                  <span>{errorMessage}</span>
+                  {(errorMessage.includes('Administrator') || errorMessage.includes('Supervisor')) && (
+                    <div className="mt-1.5">
+                      <Link
+                        to="/admin/login"
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-400 hover:underline"
+                      >
+                        Go to Management Gateway →
+                      </Link>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -410,61 +429,26 @@ export const LoginPage = () => {
               <>
                 {/* Header */}
                 <div>
-                  <h2 className="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-600/20 text-blue-300 text-[10px] font-bold uppercase tracking-wider mb-2 border border-blue-500/30">
+                    <User className="w-3 h-3 text-blue-400" />
+                    <span>Employee Self-Service Portal</span>
+                  </div>
+                  <h2 className="text-2xl sm:text-[26px] font-bold text-white tracking-tight">
                     Welcome back
                   </h2>
-                  <p className="mt-1 text-[13px] text-slate-500">
-                    Select your workspace role, then sign in securely.
+                  <p className="mt-1 text-[13px] text-slate-400">
+                    Enter your employee credentials to access your DTR, schedule &amp; payslips.
                   </p>
-                </div>
-
-                {/* 3 Role Selection Cards */}
-                <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
-                  {roleConfigs.map((role) => {
-                    const IconComponent = role.icon;
-                    const isSelected = selectedRole === role.id;
-
-                    return (
-                      <button
-                        key={role.id}
-                        type="button"
-                        onClick={() => handleRoleSelect(role.id)}
-                        className={`flex flex-col text-left p-3 sm:p-3.5 rounded-2xl border transition-all duration-200 relative ${
-                          isSelected
-                            ? 'bg-blue-50/70 border-blue-600 shadow-sm ring-1 ring-blue-600'
-                            : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/60'
-                        }`}
-                      >
-                        <div
-                          className={`h-7 w-7 rounded-lg flex items-center justify-center mb-2.5 transition ${
-                            isSelected
-                              ? 'bg-blue-600 text-white shadow-sm'
-                              : 'bg-slate-100 text-slate-600'
-                          }`}
-                        >
-                          <IconComponent className="w-4 h-4" />
-                        </div>
-
-                        <span className="text-[12px] sm:text-[13px] font-bold text-slate-900 leading-tight">
-                          {role.title}
-                        </span>
-
-                        <span className="text-[10px] text-slate-500 leading-tight mt-1 truncate w-full">
-                          {role.subtitle}
-                        </span>
-                      </button>
-                    );
-                  })}
                 </div>
 
                 {/* Login Form */}
                 <form onSubmit={handleLogin} className="space-y-4 pt-1">
                   <div>
-                    <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">
+                    <label className="block text-[12px] font-semibold text-slate-300 mb-1.5">
                       Full Name, Username, or Employee ID
                     </label>
                     <div className="relative rounded-xl">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
                         <Mail className="h-4 w-4" />
                       </div>
                       <input
@@ -473,18 +457,18 @@ export const LoginPage = () => {
                         autoComplete="off"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        placeholder="e.g. Maria Santos or EMP-2026-001"
-                        className="block w-full pl-10 pr-3.5 py-2.5 sm:py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition shadow-sm"
+                        placeholder="e.g. juan.cruz or EMP-001-01"
+                        className="block w-full pl-10 pr-3.5 py-2.5 sm:py-3 bg-[#081226] border border-slate-700/80 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition shadow-inner font-mono"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">
+                    <label className="block text-[12px] font-semibold text-slate-300 mb-1.5">
                       Password
                     </label>
                     <div className="relative rounded-xl">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
                         <Lock className="h-4 w-4" />
                       </div>
                       <input
@@ -494,25 +478,25 @@ export const LoginPage = () => {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="••••••••••••"
-                        className="block w-full pl-10 pr-10 py-2.5 sm:py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition shadow-sm"
+                        className="block w-full pl-10 pr-10 py-2.5 sm:py-3 bg-[#081226] border border-slate-700/80 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition shadow-inner font-mono"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600"
+                        className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-white"
                       >
                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between text-[12px] text-slate-600 pt-0.5">
+                  <div className="flex items-center justify-between text-[12px] text-slate-400 pt-0.5">
                     <label className="flex items-center gap-2 cursor-pointer select-none">
                       <input
                         type="checkbox"
                         checked={trustDevice}
                         onChange={(e) => setTrustDevice(e.target.checked)}
-                        className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 transition"
+                        className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-700 bg-[#081226] transition"
                       />
                       <span>Trust this device for 30 days</span>
                     </label>
@@ -523,42 +507,76 @@ export const LoginPage = () => {
                         e.preventDefault();
                         addToast({
                           title: 'Password Reset',
-                          message: 'Password reset link sent to your workspace administrator.',
+                          message: 'Password reset request notified to your branch supervisor.',
                           type: 'info',
                         });
                       }}
-                      className="text-blue-600 hover:text-blue-700 font-semibold transition"
+                      className="text-blue-400 hover:text-blue-300 font-semibold transition"
                     >
                       Forgot password?
                     </a>
                   </div>
 
-                  <div className="pt-2">
+                  {/* Google reCAPTCHA Enterprise Verification & License */}
+                  <div className="pt-2 flex flex-col items-center sm:items-start">
+                    <RecaptchaWidget
+                      verified={recaptchaVerified}
+                      onVerify={(val) => {
+                        setRecaptchaVerified(val);
+                        setRecaptchaError('');
+                      }}
+                      error={recaptchaError}
+                    />
+                  </div>
+
+                  <div className="pt-1">
                     <button
                       type="submit"
                       disabled={submitting || loading}
-                      className="w-full flex justify-center items-center gap-2 py-3 sm:py-3.5 px-4 rounded-xl text-sm font-semibold text-white bg-[#2563EB] hover:bg-blue-700 active:bg-blue-800 shadow-md shadow-blue-500/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 transition duration-150 disabled:opacity-50"
+                      className="w-full flex justify-center items-center gap-2 py-3 sm:py-3.5 px-4 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 active:bg-blue-700 shadow-lg shadow-blue-600/30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 disabled:opacity-50"
                     >
                       <LogIn className="h-4 w-4" strokeWidth={2.2} />
                       <span>Sign in securely</span>
                     </button>
+
+                    {/* Google reCAPTCHA License Notice */}
+                    <p className="text-[10px] text-center text-slate-500 mt-2 leading-tight">
+                      Protected by Google reCAPTCHA Enterprise. Google{' '}
+                      <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-300 font-medium">Privacy Policy</a>
+                      {' '}and{' '}
+                      <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-300 font-medium">Terms of Service</a> apply.
+                    </p>
                   </div>
 
                   <div className="text-center pt-1">
                     <button
                       type="button"
                       onClick={() => setAuthMode('REGISTER')}
-                      className="text-xs text-blue-600 hover:text-blue-700 font-semibold inline-flex items-center gap-1 transition"
+                      className="text-xs text-blue-400 hover:text-blue-300 font-semibold inline-flex items-center gap-1 transition"
                     >
-                      <span>No account yet? Create employee profile & account</span>
+                      <span>No account yet? Create employee profile &amp; account</span>
                       <span>→</span>
                     </button>
                   </div>
 
-                  {/* MFA Info Banner */}
-                  <div className="mt-4 p-3 bg-slate-50 border border-slate-200/80 rounded-xl flex items-center gap-2.5 text-[11px] text-slate-600">
-                    <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>Multi-factor authentication is configured for Admin and Payroll roles.</span>
+                  {/* Isolated Secure Admin & Supervisor Gateway Link Card */}
+                  <div className="mt-4 pt-3.5 border-t border-slate-800/80 flex items-center justify-between text-xs bg-[#081226]/80 border border-slate-800/80 p-3.5 rounded-2xl">
+                    <div className="flex items-center gap-2.5 text-slate-300">
+                      <div className="p-2 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30">
+                        <Briefcase className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="font-bold block text-white leading-tight">Supervisor or Administrator?</span>
+                        <span className="text-[10px] text-slate-400 leading-tight">Branch management &amp; root console</span>
+                      </div>
+                    </div>
+                    <Link
+                      to="/admin/login"
+                      className="font-bold text-white bg-blue-600 hover:bg-blue-500 px-3.5 py-1.5 rounded-xl transition shadow-lg shadow-blue-600/20 inline-flex items-center gap-1 text-[11px]"
+                    >
+                      <span>Management Gateway</span>
+                      <span>→</span>
+                    </Link>
                   </div>
                 </form>
               </>
@@ -566,21 +584,21 @@ export const LoginPage = () => {
               <>
                 {/* Employee Account Creation Form */}
                 <div>
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[10px] font-bold uppercase tracking-wider mb-2 border border-blue-200">
-                    <Sparkles className="w-3 h-3" />
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-600/20 text-blue-300 text-[10px] font-bold uppercase tracking-wider mb-2 border border-blue-500/30">
+                    <Sparkles className="w-3 h-3 text-blue-400" />
                     <span>Self-Service Employee Portal</span>
                   </div>
-                  <h2 className="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight">
+                  <h2 className="text-2xl sm:text-[26px] font-bold text-white tracking-tight">
                     Create Employee Account
                   </h2>
-                  <p className="mt-1 text-[13px] text-slate-500">
-                    If your name is not registered in the system yet, an employee profile & QR badge will be created automatically.
+                  <p className="mt-1 text-[13px] text-slate-400">
+                    If your name is not registered in the system yet, an employee profile &amp; QR badge will be created automatically.
                   </p>
                 </div>
 
                 <form onSubmit={handleRegister} className="space-y-3.5 pt-1">
                   <div>
-                    <label className="block text-[12px] font-semibold text-slate-700 mb-1">
+                    <label className="block text-[12px] font-semibold text-slate-300 mb-1">
                       Full Name *
                     </label>
                     <input
@@ -597,13 +615,13 @@ export const LoginPage = () => {
                         });
                       }}
                       placeholder="e.g. Maria Santos"
-                      className="block w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 transition shadow-sm"
+                      className="block w-full px-3.5 py-2.5 bg-[#081226] border border-slate-700/80 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition shadow-inner"
                     />
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[12px] font-semibold text-slate-700 mb-1">
+                      <label className="block text-[12px] font-semibold text-slate-300 mb-1">
                         Username (Sign-in ID) *
                       </label>
                       <input
@@ -612,12 +630,12 @@ export const LoginPage = () => {
                         value={regForm.username}
                         onChange={(e) => setRegForm({ ...regForm, username: e.target.value })}
                         placeholder="e.g. maria.santos"
-                        className="block w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-600 transition shadow-sm"
+                        className="block w-full px-3.5 py-2.5 bg-[#081226] border border-slate-700/80 rounded-xl text-white placeholder-slate-500 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 transition shadow-inner"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-[12px] font-semibold text-slate-700 mb-1">
+                      <label className="block text-[12px] font-semibold text-slate-300 mb-1">
                         Password *
                       </label>
                       <input
@@ -626,36 +644,36 @@ export const LoginPage = () => {
                         value={regForm.password}
                         onChange={(e) => setRegForm({ ...regForm, password: e.target.value })}
                         placeholder="••••••••••••"
-                        className="block w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-600 transition shadow-sm"
+                        className="block w-full px-3.5 py-2.5 bg-[#081226] border border-slate-700/80 rounded-xl text-white placeholder-slate-500 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 transition shadow-inner"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[12px] font-semibold text-slate-700 mb-1">
+                      <label className="block text-[12px] font-semibold text-slate-300 mb-1">
                         Email Address
                       </label>
                       <input
                         type="email"
                         value={regForm.email}
                         onChange={(e) => setRegForm({ ...regForm, email: e.target.value })}
-                        placeholder="name@apexhris.enterprise"
-                        className="block w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 transition shadow-sm"
+                        placeholder="name@redmart.enterprise"
+                        className="block w-full px-3.5 py-2.5 bg-[#081226] border border-slate-700/80 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition shadow-inner"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-[12px] font-semibold text-slate-700 mb-1">
-                        Branch
+                      <label className="block text-[12px] font-semibold text-slate-300 mb-1">
+                        Assigned Branch
                       </label>
                       <select
                         value={regForm.branchId}
                         onChange={(e) => setRegForm({ ...regForm, branchId: e.target.value })}
-                        className="block w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 transition shadow-sm"
+                        className="block w-full px-3.5 py-2.5 bg-[#081226] border border-slate-700/80 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition shadow-inner"
                       >
                         {branches.map((b) => (
-                          <option key={b.id} value={b.id}>
+                          <option key={b.id} value={b.id} className="bg-[#081226] text-white">
                             {b.name}
                           </option>
                         ))}
@@ -665,7 +683,7 @@ export const LoginPage = () => {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[12px] font-semibold text-slate-700 mb-1">
+                      <label className="block text-[12px] font-semibold text-slate-300 mb-1">
                         Job Position
                       </label>
                       <input
@@ -673,11 +691,11 @@ export const LoginPage = () => {
                         value={regForm.position}
                         onChange={(e) => setRegForm({ ...regForm, position: e.target.value })}
                         placeholder="e.g. Front Desk & Staff"
-                        className="block w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 transition shadow-sm"
+                        className="block w-full px-3.5 py-2.5 bg-[#081226] border border-slate-700/80 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition shadow-inner"
                       />
                     </div>
                     <div>
-                      <label className="block text-[12px] font-semibold text-slate-700 mb-1">
+                      <label className="block text-[12px] font-semibold text-slate-300 mb-1">
                         Department
                       </label>
                       <input
@@ -685,81 +703,81 @@ export const LoginPage = () => {
                         value={regForm.department}
                         onChange={(e) => setRegForm({ ...regForm, department: e.target.value })}
                         placeholder="Operations"
-                        className="block w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 transition shadow-sm"
+                        className="block w-full px-3.5 py-2.5 bg-[#081226] border border-slate-700/80 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition shadow-inner"
                       />
                     </div>
                   </div>
 
                   {/* ID Document Upload & Verification Section */}
-                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-3">
+                  <div className="p-4 rounded-2xl bg-[#081226]/80 border border-slate-800/90 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <ShieldCheck className="w-4 h-4 text-blue-600" />
-                        <span className="text-xs font-bold text-slate-900">ID Document Verification *</span>
+                        <ShieldCheck className="w-4 h-4 text-blue-400" />
+                        <span className="text-xs font-bold text-white">ID Document Verification *</span>
                       </div>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">
-                        Required to Confirm
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-600/20 text-blue-300 border border-blue-500/30">
+                        Required
                       </span>
                     </div>
 
-                    <p className="text-[11px] text-slate-500">
+                    <p className="text-[11px] text-slate-400">
                       Upload a valid government or company ID to verify your identity and confirm account activation.
                     </p>
 
                     <div>
-                      <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                      <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">
                         Select ID Type
                       </label>
                       <select
                         value={regForm.idType}
                         onChange={(e) => setRegForm({ ...regForm, idType: e.target.value })}
-                        className="block w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                        className="block w-full px-3 py-2 bg-[#060c18] border border-slate-700/80 rounded-xl text-xs text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
-                        <option value="PhilID / National ID">PhilID / National ID (Philippine Identification System)</option>
-                        <option value="Driver's License">Driver's License (LTO)</option>
-                        <option value="Passport">Passport</option>
-                        <option value="SSS / UMID Card">SSS / UMID Card</option>
-                        <option value="PRC ID">PRC ID / Professional License</option>
-                        <option value="Company / Work ID">Company / Work ID</option>
-                        <option value="Voter's ID / Certificate">Voter's ID / Certificate</option>
+                        <option value="PhilID / National ID" className="bg-[#081226] text-white">PhilID / National ID (Philippine Identification System)</option>
+                        <option value="Driver's License" className="bg-[#081226] text-white">Driver's License (LTO)</option>
+                        <option value="Passport" className="bg-[#081226] text-white">Passport</option>
+                        <option value="SSS / UMID Card" className="bg-[#081226] text-white">SSS / UMID Card</option>
+                        <option value="PRC ID" className="bg-[#081226] text-white">PRC ID / Professional License</option>
+                        <option value="Company / Work ID" className="bg-[#081226] text-white">Company / Work ID</option>
+                        <option value="Voter's ID / Certificate" className="bg-[#081226] text-white">Voter's ID / Certificate</option>
                       </select>
                     </div>
 
                     {/* Validation Error Alert */}
                     {idValidationError && (
-                      <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-medium flex items-start gap-2.5 animate-in fade-in">
-                        <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                      <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 font-medium flex items-start gap-2.5 animate-in fade-in">
+                        <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
                         <div>
-                          <p className="font-bold text-rose-800">Invalid ID Document</p>
-                          <p className="text-[11px] text-rose-600 mt-0.5">{idValidationError}</p>
+                          <p className="font-bold text-rose-300">Invalid ID Document</p>
+                          <p className="text-[11px] text-rose-400 mt-0.5">{idValidationError}</p>
                         </div>
                       </div>
                     )}
 
                     {/* Validating Spinner */}
                     {idValidating && (
-                      <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-center gap-3 text-xs text-blue-700 font-semibold animate-pulse">
-                        <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                        <span>Analyzing & validating {regForm.idType} document format...</span>
+                      <div className="p-4 bg-blue-600/10 border border-blue-500/30 rounded-xl flex items-center justify-center gap-3 text-xs text-blue-300 font-semibold animate-pulse">
+                        <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                        <span>Analyzing &amp; validating {regForm.idType} document format...</span>
                       </div>
                     )}
 
                     {/* Upload Box or Live Preview */}
                     {!idValidating && idPreview ? (
-                      <div className="p-3 bg-white border border-emerald-200 rounded-xl flex items-center justify-between gap-3 shadow-sm">
+                      <div className="p-3 bg-[#060c18] border border-emerald-500/40 rounded-xl flex items-center justify-between gap-3 shadow-sm">
                         <div className="flex items-center gap-3 overflow-hidden">
                           <img
                             src={idPreview}
                             alt="ID Preview"
-                            className="w-14 h-10 object-cover rounded-lg border border-slate-200 shrink-0 bg-slate-100"
+                            className="w-14 h-10 object-cover rounded-lg border border-slate-700 shrink-0 bg-slate-900"
                           />
                           <div className="truncate">
-                            <p className="text-xs font-bold text-slate-900 truncate">
+                            <p className="text-xs font-bold text-white truncate">
                               {regForm.idDocumentName || 'Uploaded ID Document'}
                             </p>
-                            <div className="flex items-center gap-1.5 text-[10px] text-emerald-600 font-semibold mt-0.5">
+                            <div className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-semibold mt-0.5">
                               <CheckCircle2 className="w-3 h-3" />
-                              <span>{regForm.idType} Verified & Accepted</span>
+                              <span>{regForm.idType} Verified &amp; Accepted</span>
                             </div>
                           </div>
                         </div>
@@ -767,19 +785,19 @@ export const LoginPage = () => {
                         <button
                           type="button"
                           onClick={handleRemoveId}
-                          className="px-2.5 py-1 text-[11px] font-semibold text-rose-600 hover:bg-rose-50 rounded-lg transition shrink-0"
+                          className="px-2.5 py-1 text-[11px] font-semibold text-rose-400 hover:bg-rose-500/10 rounded-lg transition shrink-0"
                         >
                           Change
                         </button>
                       </div>
                     ) : !idValidating ? (
                       <div className="space-y-2">
-                        <label className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-300 hover:border-blue-500 bg-white rounded-2xl cursor-pointer transition group">
-                          <ShieldCheck className="w-7 h-7 text-slate-400 group-hover:text-blue-600 transition mb-1" />
-                          <span className="text-xs font-bold text-slate-700 group-hover:text-blue-600">
+                        <label className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-700 hover:border-blue-500 bg-[#060c18] rounded-2xl cursor-pointer transition group">
+                          <ShieldCheck className="w-7 h-7 text-slate-500 group-hover:text-blue-400 transition mb-1" />
+                          <span className="text-xs font-bold text-slate-300 group-hover:text-blue-400">
                             Click to upload ID photo or scan
                           </span>
-                          <span className="text-[10px] text-slate-400 mt-0.5">
+                          <span className="text-[10px] text-slate-500 mt-0.5">
                             JPG, PNG, or PDF (Must be a clear landscape ID card)
                           </span>
                           <input
@@ -791,11 +809,11 @@ export const LoginPage = () => {
                         </label>
 
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] text-slate-400">Or use instant sample ID:</span>
+                          <span className="text-[10px] text-slate-500">Or use instant sample ID:</span>
                           <button
                             type="button"
                             onClick={handleUseSampleId}
-                            className="text-[11px] text-blue-600 hover:text-blue-700 font-bold hover:underline"
+                            className="text-[11px] text-blue-400 hover:text-blue-300 font-bold hover:underline"
                           >
                             + Attach Verified Sample ID
                           </button>
@@ -804,92 +822,112 @@ export const LoginPage = () => {
                     ) : null}
                   </div>
 
-                    {/* Terms & Conditions Agreement Checkbox */}
-                    <div className="flex items-start gap-2 pt-1 text-xs text-slate-600">
-                      <input
-                        type="checkbox"
-                        id="termsAgree"
-                        checked={acceptedTerms}
-                        onChange={(e) => setAcceptedTerms(e.target.checked)}
-                        className="mt-0.5 w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 transition"
-                        required
-                      />
-                      <label htmlFor="termsAgree" className="text-[11px] leading-tight">
-                        I agree to the{' '}
-                        <button
-                          type="button"
-                          onClick={() => setIsTermsOpen(true)}
-                          className="font-bold text-blue-600 hover:underline"
-                        >
-                          Terms of Service & Data Privacy Act (R.A. 10173)
-                        </button>
-                      </label>
-                    </div>
-
-                    <div className="pt-2">
-                      <button
-                        type="submit"
-                        disabled={submitting || !acceptedTerms}
-                        className="w-full flex justify-center items-center gap-2 py-3 sm:py-3.5 px-4 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 shadow-md shadow-blue-500/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 transition duration-150 disabled:opacity-50"
-                      >
-                        <UserPlus className="h-4 w-4" />
-                        <span>Confirm ID & Create Account</span>
-                      </button>
-                    </div>
-
-                    <div className="text-center pt-1">
+                  {/* Terms & Conditions Agreement Checkbox */}
+                  <div className="flex items-start gap-2 pt-1 text-xs text-slate-400">
+                    <input
+                      type="checkbox"
+                      id="termsAgree"
+                      checked={acceptedTerms}
+                      onChange={(e) => setAcceptedTerms(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-700 bg-[#081226] transition"
+                      required
+                    />
+                    <label htmlFor="termsAgree" className="text-[11px] leading-tight">
+                      I agree to the{' '}
                       <button
                         type="button"
-                        onClick={() => setAuthMode('SIGN_IN')}
-                        className="text-xs text-slate-600 hover:text-blue-600 font-semibold inline-flex items-center gap-1 transition"
+                        onClick={() => setIsTermsOpen(true)}
+                        className="font-bold text-blue-400 hover:underline"
                       >
-                        <span>Already have an account? Sign in here</span>
+                        Terms of Service &amp; Data Privacy Act (R.A. 10173)
                       </button>
-                    </div>
-                  </form>
-                </>
-              )}
-            </div>
+                    </label>
+                  </div>
+
+                  {/* Google reCAPTCHA Verification */}
+                  <div className="pt-2 flex flex-col items-center sm:items-start">
+                    <RecaptchaWidget
+                      verified={recaptchaVerified}
+                      onVerify={(val) => {
+                        setRecaptchaVerified(val);
+                        setRecaptchaError('');
+                      }}
+                      error={recaptchaError}
+                    />
+                  </div>
+
+                  <div className="pt-1">
+                    <button
+                      type="submit"
+                      disabled={submitting || !acceptedTerms}
+                      className="w-full flex justify-center items-center gap-2 py-3 sm:py-3.5 px-4 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 active:bg-blue-700 shadow-lg shadow-blue-600/30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 disabled:opacity-50"
+                    >
+                      <UserPlus className="h-4 w-4" />
+                      <span>Confirm ID &amp; Create Account</span>
+                    </button>
+
+                    {/* Google reCAPTCHA License Notice */}
+                    <p className="text-[10px] text-center text-slate-500 mt-2 leading-tight">
+                      Protected by Google reCAPTCHA Enterprise. Google{' '}
+                      <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-300 font-medium">Privacy Policy</a>
+                      {' '}and{' '}
+                      <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-300 font-medium">Terms of Service</a> apply.
+                    </p>
+                  </div>
+
+                  <div className="text-center pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setAuthMode('SIGN_IN')}
+                      className="text-xs text-slate-400 hover:text-blue-400 font-semibold inline-flex items-center gap-1 transition"
+                    >
+                      <span>Already have an account? Sign in here</span>
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
           </div>
-
-          {/* Bottom Page Footer */}
-          <div className="w-full max-w-[500px] mx-auto mt-6 pt-2 flex flex-col gap-2.5 text-[11px] text-slate-500">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                <span>AES-256 Protected & R.A. 10173 Compliant</span>
-              </span>
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsTermsOpen(true)}
-                  className="hover:text-slate-800 font-semibold transition"
-                >
-                  Privacy Policy
-                </button>
-                <span>·</span>
-                <button
-                  type="button"
-                  onClick={() => setIsTermsOpen(true)}
-                  className="hover:text-slate-800 font-semibold transition"
-                >
-                  Terms of Service
-                </button>
-              </div>
-            </div>
-
-            {/* Developer Watermark */}
-            <div className="flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-slate-100/80 border border-slate-200/80 text-[10px] font-mono font-bold text-slate-600">
-              <Code className="w-3 h-3 text-blue-600" />
-              <span>Devs: LAWRENCE, A & TAZPER</span>
-            </div>
-          </div>
-
-          {/* Render Terms & Conditions Modal */}
-          <TermsModal isOpen={isTermsOpen} onClose={() => setIsTermsOpen(false)} />
         </div>
+
+        {/* Bottom Page Footer */}
+        <div className="w-full max-w-[500px] mx-auto mt-6 pt-2 flex flex-col gap-2.5 text-[11px] text-slate-500">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="flex items-center gap-1.5 text-slate-400">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>AES-256 Protected &amp; R.A. 10173 Compliant</span>
+            </span>
+            <div className="flex items-center gap-3 text-slate-400">
+              <button
+                type="button"
+                onClick={() => setIsTermsOpen(true)}
+                className="hover:text-white font-semibold transition"
+              >
+                Privacy Policy
+              </button>
+              <span>·</span>
+              <button
+                type="button"
+                onClick={() => setIsTermsOpen(true)}
+                className="hover:text-white font-semibold transition"
+              >
+                Terms of Service
+              </button>
+            </div>
+          </div>
+
+          {/* Developer Watermark */}
+          <div className="flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-[#0b1528] border border-slate-800/80 text-[10px] font-mono font-bold text-slate-400">
+            <Code className="w-3 h-3 text-blue-400" />
+            <span>Devs: LAWRENCE, A &amp; TAZPER</span>
+          </div>
+        </div>
+
+        {/* Render Terms & Conditions Modal */}
+        <TermsModal isOpen={isTermsOpen} onClose={() => setIsTermsOpen(false)} />
       </div>
-    );
-  };
+    </div>
+  );
+};
 
 export default LoginPage;

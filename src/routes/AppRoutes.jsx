@@ -6,6 +6,7 @@ import ProtectedRoute from '../components/shared/ProtectedRoute';
 import AppLayout from '../components/layout/AppLayout';
 
 import LoginPage from '../pages/auth/LoginPage';
+import AdminLoginPage from '../pages/auth/AdminLoginPage';
 import KioskPage from '../pages/auth/KioskPage';
 import AdminDashboard from '../pages/admin/AdminDashboard';
 import BranchManagement from '../pages/admin/BranchManagement';
@@ -22,6 +23,9 @@ import DTRModule from '../pages/dtr/DTRModule';
 import PayrollModule from '../pages/payroll/PayrollModule';
 import ReportsModule from '../pages/reports/ReportsModule';
 import SettingsModule from '../pages/settings/SettingsModule';
+import ShiftScheduling from '../pages/shifts/ShiftScheduling';
+import MySchedule from '../pages/employee/MySchedule';
+import AttendanceCorrectionModule from '../pages/corrections/AttendanceCorrectionModule';
 
 export const AppRoutes = () => {
   const { role, isAuthenticated } = useAuth();
@@ -37,6 +41,7 @@ export const AppRoutes = () => {
     <Routes>
       {/* Public Routes */}
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/admin/login" element={<AdminLoginPage />} />
       <Route path="/kiosk" element={<KioskPage />} />
 
       {/* Protected App Shell */}
@@ -103,6 +108,22 @@ export const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="admin/shifts"
+          element={
+            <ProtectedRoute allowedRoles={['SUPER_ADMIN']}>
+              <ShiftScheduling />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="admin/corrections"
+          element={
+            <ProtectedRoute allowedRoles={['SUPER_ADMIN']}>
+              <AttendanceCorrectionModule />
+            </ProtectedRoute>
+          }
+        />
 
         {/* ========================================================================= */}
         {/* SUPERVISOR DEDICATED ROUTES (SCOPED STRICTLY TO 1 BRANCH)                */}
@@ -137,6 +158,22 @@ export const AppRoutes = () => {
           element={
             <ProtectedRoute allowedRoles={['SUPERVISOR']}>
               <EmployeeManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="supervisor/shifts"
+          element={
+            <ProtectedRoute allowedRoles={['SUPERVISOR']}>
+              <ShiftScheduling />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="supervisor/corrections"
+          element={
+            <ProtectedRoute allowedRoles={['SUPERVISOR']}>
+              <AttendanceCorrectionModule />
             </ProtectedRoute>
           }
         />
@@ -185,6 +222,22 @@ export const AppRoutes = () => {
           }
         />
         <Route
+          path="employee/schedule"
+          element={
+            <ProtectedRoute allowedRoles={['EMPLOYEE']}>
+              <MySchedule />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="employee/corrections"
+          element={
+            <ProtectedRoute allowedRoles={['EMPLOYEE']}>
+              <AttendanceCorrectionModule />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="employee/dtr"
           element={
             <ProtectedRoute allowedRoles={['EMPLOYEE']}>
@@ -209,6 +262,22 @@ export const AppRoutes = () => {
           element={
             <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'SUPERVISOR', 'EMPLOYEE']}>
               <DTRModule />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="shifts"
+          element={
+            <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'SUPERVISOR']}>
+              <ShiftScheduling />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="corrections"
+          element={
+            <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'SUPERVISOR', 'EMPLOYEE']}>
+              <AttendanceCorrectionModule />
             </ProtectedRoute>
           }
         />

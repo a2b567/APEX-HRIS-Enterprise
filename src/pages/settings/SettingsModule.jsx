@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/shared/Toast';
@@ -579,6 +579,49 @@ export const SettingsModule = () => {
               />
               <p className="text-[10px] text-slate-400 mt-1">Automatically logs out inactive supervisory and administrative sessions</p>
             </div>
+          </div>
+
+          {/* Google reCAPTCHA Enterprise License & Credentials */}
+          <div className="pt-4 border-t border-slate-100 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <h4 className="text-xs font-bold text-slate-900">Google reCAPTCHA Enterprise License</h4>
+              </div>
+              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full uppercase">
+                Licensed &amp; Active
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                  reCAPTCHA Site Key (License ID)
+                </label>
+                <input
+                  type="text"
+                  value={formData.recaptchaSiteKey || '6Ld_redmart_enterprise_sec_v2'}
+                  onChange={(e) => setFormData({ ...formData, recaptchaSiteKey: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 text-xs text-slate-800 font-mono rounded-xl p-2.5 focus:bg-white focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                  reCAPTCHA Secret Key
+                </label>
+                <input
+                  type="password"
+                  value={formData.recaptchaSecretKey || '6Ld_sec_redmart_server_key_verified'}
+                  onChange={(e) => setFormData({ ...formData, recaptchaSecretKey: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 text-xs text-slate-800 font-mono rounded-xl p-2.5 focus:bg-white focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <p className="text-[10px] text-slate-500">
+              Protects portal sign-ins, kiosk registrations, and employee self-service against credential stuffing, automated bots, and brute force attacks under Google Cloud Terms of Service.
+            </p>
           </div>
           </div>
         )}

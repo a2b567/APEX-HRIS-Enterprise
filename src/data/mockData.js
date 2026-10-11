@@ -1,7 +1,6 @@
-﻿/**
- * APEX HRIS Enterprise — Clean System Seed
- * No demo data. All collections start empty.
- * Only the Super Admin account is pre-seeded for initial login.
+/**
+ * REDMART: Multi-Branch Digital Timekeeping & Payroll System
+ * Clean System Seed with 5 Centrally Managed Branches
  */
 
 export const INITIAL_BRANCHES = [
@@ -11,14 +10,58 @@ export const INITIAL_BRANCHES = [
     name: 'Headquarters Main Branch',
     location: 'Corporate Center, Ayala Ave, Makati City',
     contactNumber: '+63 (02) 8888-0101',
-    email: 'makati.hq@apexhris.enterprise',
-    supervisorId: null,
+    email: 'makati.hq@redmart.enterprise',
+    supervisorId: 101,
     status: 'Active',
     establishedDate: '2026-01-01',
   },
+  {
+    id: 'BRANCH-002',
+    code: 'B002',
+    name: 'BGC Innovation Hub',
+    location: 'High Street South, BGC, Taguig City',
+    contactNumber: '+63 (02) 8888-0102',
+    email: 'bgc.hub@redmart.enterprise',
+    supervisorId: 102,
+    status: 'Active',
+    establishedDate: '2026-01-15',
+  },
+  {
+    id: 'BRANCH-003',
+    code: 'B003',
+    name: 'Cebu IT Park Regional Hub',
+    location: 'Asia Town IT Park, Lahug, Cebu City',
+    contactNumber: '+63 (32) 412-8803',
+    email: 'cebu.hub@redmart.enterprise',
+    supervisorId: 103,
+    status: 'Active',
+    establishedDate: '2026-02-01',
+  },
+  {
+    id: 'BRANCH-004',
+    code: 'B004',
+    name: 'Davao Regional Center',
+    location: 'Abreeza Corporate Center, Bajada, Davao City',
+    contactNumber: '+63 (82) 298-8804',
+    email: 'davao.hub@redmart.enterprise',
+    supervisorId: 104,
+    status: 'Active',
+    establishedDate: '2026-02-15',
+  },
+  {
+    id: 'BRANCH-005',
+    code: 'B005',
+    name: 'Ortigas Commercial Center',
+    location: 'ADB Avenue, Ortigas Center, Pasig City',
+    contactNumber: '+63 (02) 8888-0105',
+    email: 'ortigas.hub@redmart.enterprise',
+    supervisorId: 105,
+    status: 'Active',
+    establishedDate: '2026-03-01',
+  },
 ];
 
-// Seeded Super Admin only
+// Seeded Super Admin and Branch Supervisors
 export const INITIAL_USERS = [
   {
     id: 1,
@@ -26,27 +69,148 @@ export const INITIAL_USERS = [
     username: 'admin',
     password: 'hashed_Admin@123',
     name: 'System Administrator',
-    email: 'admin@apexhris.enterprise',
+    email: 'admin@redmart.enterprise',
     position: 'Chief Administrator',
     avatar: '',
     status: 'Active',
     branchId: null, // Global access — no branch restriction
   },
+  {
+    id: 101,
+    role: 'SUPERVISOR',
+    username: 'aron',
+    password: 'hashed_Supervisor@123',
+    name: 'Aron Chester M. Sangcap',
+    email: 'aron.sangcap@redmart.enterprise',
+    position: 'Branch Operations Supervisor',
+    avatar: '',
+    status: 'Active',
+    branchId: 'BRANCH-001',
+  },
+  {
+    id: 102,
+    role: 'SUPERVISOR',
+    username: 'marco',
+    password: 'hashed_Supervisor@123',
+    name: 'Marco F. Baluncio',
+    email: 'marco.baluncio@redmart.enterprise',
+    position: 'Branch Operations Supervisor',
+    avatar: '',
+    status: 'Active',
+    branchId: 'BRANCH-002',
+  },
+  {
+    id: 103,
+    role: 'SUPERVISOR',
+    username: 'sup.cebu',
+    password: 'hashed_Supervisor@123',
+    name: 'Elena Villanueva',
+    email: 'elena.villanueva@redmart.enterprise',
+    position: 'Branch Operations Supervisor',
+    avatar: '',
+    status: 'Active',
+    branchId: 'BRANCH-003',
+  },
+  {
+    id: 104,
+    role: 'SUPERVISOR',
+    username: 'sup.davao',
+    password: 'hashed_Supervisor@123',
+    name: 'Mark Torres',
+    email: 'mark.torres@redmart.enterprise',
+    position: 'Branch Operations Supervisor',
+    avatar: '',
+    status: 'Active',
+    branchId: 'BRANCH-004',
+  },
+  {
+    id: 105,
+    role: 'SUPERVISOR',
+    username: 'sup.ortigas',
+    password: 'hashed_Supervisor@123',
+    name: 'Patricia Lim',
+    email: 'patricia.lim@redmart.enterprise',
+    position: 'Branch Operations Supervisor',
+    avatar: '',
+    status: 'Active',
+    branchId: 'BRANCH-005',
+  },
 ];
 
-
-// No employees pre-seeded — all employees must be added manually or via CSV import
+// No employees pre-seeded — all employees added manually or via CSV import
 export const INITIAL_EMPLOYEES = [];
 
+// Standard Shift Definitions
+export const INITIAL_SHIFTS = [
+  {
+    id: 'SHIFT-MORNING',
+    name: 'Morning Shift',
+    code: 'MS',
+    startTime: '06:00',
+    endTime: '15:00',
+    breakMinutes: 60,
+    gracePeriodMinutes: 15,
+    description: 'Early opening store shift (06:00 AM - 03:00 PM)',
+    color: 'amber',
+  },
+  {
+    id: 'SHIFT-REGULAR',
+    name: 'Standard Day Shift',
+    code: 'DS',
+    startTime: '08:00',
+    endTime: '17:00',
+    breakMinutes: 60,
+    gracePeriodMinutes: 15,
+    description: 'Standard store & operations shift (08:00 AM - 05:00 PM)',
+    color: 'blue',
+  },
+  {
+    id: 'SHIFT-MID',
+    name: 'Mid-Day Shift',
+    code: 'MDS',
+    startTime: '10:00',
+    endTime: '19:00',
+    breakMinutes: 60,
+    gracePeriodMinutes: 15,
+    description: 'Midday peak coverage shift (10:00 AM - 07:00 PM)',
+    color: 'indigo',
+  },
+  {
+    id: 'SHIFT-CLOSING',
+    name: 'Closing Shift',
+    code: 'CS',
+    startTime: '13:00',
+    endTime: '22:00',
+    breakMinutes: 60,
+    gracePeriodMinutes: 15,
+    description: 'Store closing & inventory turnover (01:00 PM - 10:00 PM)',
+    color: 'purple',
+  },
+  {
+    id: 'SHIFT-NIGHT',
+    name: 'Night Differential Shift',
+    code: 'NS',
+    startTime: '22:00',
+    endTime: '06:00',
+    breakMinutes: 60,
+    gracePeriodMinutes: 15,
+    description: 'Overnight restocking & logistics (10:00 PM - 06:00 AM)',
+    color: 'slate',
+  },
+];
+
+// Initial Schedules & Attendance Corrections
+export const INITIAL_SCHEDULES = [];
+export const INITIAL_CORRECTIONS = [];
 
 // No attendance logs pre-seeded
 export const generateInitialAttendanceLogs = () => [];
 
 // Standard Company Policy & Payroll Settings
 export const INITIAL_SETTINGS = {
-  companyName: 'REDDMART Enterprise',
-  systemTitle: 'REDDMART Enterprise',
-  companyTagline: 'Enterprise Multi-Branch HRIS & Payroll Platform',
+  companyName: 'REDMART',
+  systemTitle: 'REDMART: Multi-Branch Digital Timekeeping & Payroll System',
+  companyTagline: 'Multi-Branch Digital Timekeeping & Payroll System',
   taxIdNumber: '',
   standardWorkHoursPerDay: 8,
   gracePeriodMinutes: 15,
@@ -66,7 +230,7 @@ export const INITIAL_SETTINGS = {
     atRestEncryption: true,
     qrEncryptionEnabled: true,
     auditLogHashing: true,
-    encryptionSalt: 'APEX_DTR_SECURE_SALT_v2_2026',
+    encryptionSalt: 'REDMART_DTR_SECURE_SALT_v2_2026',
     sessionTimeoutMinutes: 60,
     twoFactorEnforced: false,
     tlsEnforced: true,
