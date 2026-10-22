@@ -19,7 +19,6 @@ import {
   Building2,
   CheckCircle2,
   Code,
-  Briefcase,
   ExternalLink,
 } from 'lucide-react';
 import { useToast } from '../../components/shared/Toast';
@@ -557,26 +556,6 @@ export const LoginPage = () => {
                       <span>No account yet? Create employee profile &amp; account</span>
                       <span>→</span>
                     </button>
-                  </div>
-
-                  {/* Isolated Secure Admin & Supervisor Gateway Link Card */}
-                  <div className="mt-4 pt-3.5 border-t border-slate-800/80 flex items-center justify-between text-xs bg-[#081226]/80 border border-slate-800/80 p-3.5 rounded-2xl">
-                    <div className="flex items-center gap-2.5 text-slate-300">
-                      <div className="p-2 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30">
-                        <Briefcase className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <span className="font-bold block text-white leading-tight">Supervisor or Administrator?</span>
-                        <span className="text-[10px] text-slate-400 leading-tight">Branch management &amp; root console</span>
-                      </div>
-                    </div>
-                    <Link
-                      to="/admin/login"
-                      className="font-bold text-white bg-blue-600 hover:bg-blue-500 px-3.5 py-1.5 rounded-xl transition shadow-lg shadow-blue-600/20 inline-flex items-center gap-1 text-[11px]"
-                    >
-                      <span>Management Gateway</span>
-                      <span>→</span>
-                    </Link>
                   </div>
                 </form>
               </>
