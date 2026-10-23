@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '../../components/shared/Toast';
 import TermsModal from '../../components/shared/TermsModal';
+import Modal from '../../components/shared/Modal';
 import { validateIdDocument } from '../../utils/idValidator';
 import RecaptchaWidget from '../../components/shared/RecaptchaWidget';
 
@@ -40,9 +41,11 @@ export const LoginPage = () => {
   const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(true);
 
-  // Google reCAPTCHA Enterprise Verification State
+  // Google reCAPTCHA Enterprise Verification State & Modal
   const [recaptchaVerified, setRecaptchaVerified] = useState(false);
   const [recaptchaError, setRecaptchaError] = useState('');
+  const [showCaptchaModal, setShowCaptchaModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState('SIGN_IN');
 
   // Registration form state for employee
   const [regForm, setRegForm] = useState({
@@ -67,21 +70,32 @@ export const LoginPage = () => {
   const navigate = useNavigate();
   const { addToast } = useToast();
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
+  const handleLogin = (e) => {
+    if (e) e.preventDefault();
     setErrorMessage('');
     setRecaptchaError('');
 
-    if (!recaptchaVerified) {
-      setRecaptchaError('Please check "I\'m not a robot" to complete security verification.');
+    if (!email.trim() || !password.trim()) {
+      setErrorMessage('Please enter your username/ID and password.');
       return;
     }
 
+    if (!recaptchaVerified) {
+      setPendingAction('SIGN_IN');
+      setShowCaptchaModal(true);
+      return;
+    }
+
+    executeSignIn();
+  };
+
+  const executeSignIn = async () => {
     setSubmitting(true);
     try {
       // Unified login: accepts Super Admin, Supervisor, and Employee
       const result = await login(email, password);
       if (result.success) {
+        setShowCaptchaModal(false);
         const userRole = result.user?.role;
         addToast({
           title: 'Welcome Back',
@@ -97,9 +111,13 @@ export const LoginPage = () => {
           navigate('/employee/dashboard');
         }
       } else {
+        setShowCaptchaModal(false);
+        setRecaptchaVerified(false);
         setErrorMessage(result.message || 'Login failed. Check your credentials.');
       }
     } catch (err) {
+      setShowCaptchaModal(false);
+      setRecaptchaVerified(false);
       setErrorMessage(err.message || 'An unexpected error occurred.');
     } finally {
       setSubmitting(false);
@@ -220,14 +238,20 @@ export const LoginPage = () => {
     }
 
     if (!recaptchaVerified) {
-      setRecaptchaError('Please check "I\'m not a robot" before creating your account.');
+      setPendingAction('REGISTER');
+      setShowCaptchaModal(true);
       return;
     }
 
+    executeRegister();
+  };
+
+  const executeRegister = async () => {
     setSubmitting(true);
     try {
       const res = await registerEmployeeAccount(regForm);
       if (res.success) {
+        setShowCaptchaModal(false);
         addToast({
           title: 'Account Created & ID Verified!',
           message: `Welcome, ${regForm.name}! Your Employee ID is ${res.employee?.employeeCode || res.employee?.id}.`,
@@ -237,9 +261,13 @@ export const LoginPage = () => {
         setPassword(regForm.password);
         setAuthMode('SIGN_IN');
       } else {
+        setShowCaptchaModal(false);
+        setRecaptchaVerified(false);
         setErrorMessage(res.message || 'Registration failed. Try again.');
       }
     } catch (err) {
+      setShowCaptchaModal(false);
+      setRecaptchaVerified(false);
       setErrorMessage(err.message || 'An error occurred during registration.');
     } finally {
       setSubmitting(false);
@@ -480,35 +508,15 @@ export const LoginPage = () => {
                     </a>
                   </div>
 
-                  {/* Google reCAPTCHA Enterprise Verification & License */}
-                  <div className="pt-2 flex flex-col items-center sm:items-start">
-                    <RecaptchaWidget
-                      verified={recaptchaVerified}
-                      onVerify={(val) => {
-                        setRecaptchaVerified(val);
-                        setRecaptchaError('');
-                      }}
-                      error={recaptchaError}
-                    />
-                  </div>
-
-                  <div className="pt-1">
+                  <div className="pt-2">
                     <button
                       type="submit"
                       disabled={submitting || loading}
                       className="w-full flex justify-center items-center gap-2 py-3 sm:py-3.5 px-4 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 active:bg-blue-700 shadow-lg shadow-blue-600/30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 disabled:opacity-50"
                     >
                       <LogIn className="h-4 w-4" strokeWidth={2.2} />
-                      <span>Sign in securely</span>
+                      <span>{submitting ? 'Signing in...' : 'Sign in securely'}</span>
                     </button>
-
-                    {/* Google reCAPTCHA License Notice */}
-                    <p className="text-[10px] text-center text-slate-500 mt-2 leading-tight">
-                      Protected by Google reCAPTCHA Enterprise. Google{' '}
-                      <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-300 font-medium">Privacy Policy</a>
-                      {' '}and{' '}
-                      <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-300 font-medium">Terms of Service</a> apply.
-                    </p>
                   </div>
 
 
@@ -789,35 +797,15 @@ export const LoginPage = () => {
                     </label>
                   </div>
 
-                  {/* Google reCAPTCHA Verification */}
-                  <div className="pt-2 flex flex-col items-center sm:items-start">
-                    <RecaptchaWidget
-                      verified={recaptchaVerified}
-                      onVerify={(val) => {
-                        setRecaptchaVerified(val);
-                        setRecaptchaError('');
-                      }}
-                      error={recaptchaError}
-                    />
-                  </div>
-
-                  <div className="pt-1">
+                  <div className="pt-2">
                     <button
                       type="submit"
                       disabled={submitting || !acceptedTerms}
                       className="w-full flex justify-center items-center gap-2 py-3 sm:py-3.5 px-4 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 active:bg-blue-700 shadow-lg shadow-blue-600/30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 disabled:opacity-50"
                     >
                       <UserPlus className="h-4 w-4" />
-                      <span>Confirm ID &amp; Create Account</span>
+                      <span>{submitting ? 'Creating account...' : 'Confirm ID & Create Account'}</span>
                     </button>
-
-                    {/* Google reCAPTCHA License Notice */}
-                    <p className="text-[10px] text-center text-slate-500 mt-2 leading-tight">
-                      Protected by Google reCAPTCHA Enterprise. Google{' '}
-                      <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-300 font-medium">Privacy Policy</a>
-                      {' '}and{' '}
-                      <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-300 font-medium">Terms of Service</a> apply.
-                    </p>
                   </div>
 
                   <div className="text-center pt-1">
@@ -870,6 +858,45 @@ export const LoginPage = () => {
 
         {/* Render Terms & Conditions Modal */}
         <TermsModal isOpen={isTermsOpen} onClose={() => setIsTermsOpen(false)} />
+
+        {/* reCAPTCHA Security Verification Modal (Pops up only when clicking Sign in securely / Submit) */}
+        <Modal
+          isOpen={showCaptchaModal}
+          onClose={() => setShowCaptchaModal(false)}
+          title="Security Verification"
+          subtitle="Confirm you are human to proceed"
+          maxWidth="max-w-md"
+        >
+          <div className="p-6 flex flex-col items-center space-y-4">
+            <p className="text-xs text-slate-600 text-center">
+              Please check the box below to complete security verification.
+            </p>
+
+            <RecaptchaWidget
+              verified={recaptchaVerified}
+              onVerify={(val) => {
+                setRecaptchaVerified(val);
+                setRecaptchaError('');
+                setTimeout(() => {
+                  setShowCaptchaModal(false);
+                  if (pendingAction === 'REGISTER') {
+                    executeRegister();
+                  } else {
+                    executeSignIn();
+                  }
+                }, 400);
+              }}
+              error={recaptchaError}
+            />
+
+            <p className="text-[10px] text-center text-slate-400 leading-tight">
+              Protected by Google reCAPTCHA Enterprise. Google{' '}
+              <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">Privacy Policy</a>
+              {' '}and{' '}
+              <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">Terms of Service</a> apply.
+            </p>
+          </div>
+        </Modal>
       </div>
     </div>
   );
