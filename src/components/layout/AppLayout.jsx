@@ -23,7 +23,7 @@ export const AppLayout = () => {
         {/* Global Footer & Developer Watermark */}
         <footer className="border-t border-slate-200/80 bg-white px-4 py-3 text-center sm:text-left sm:px-8 text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-2 mt-auto">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-700">REDMART</span>
+            <span className="font-semibold text-slate-700">REDDMART</span>
             <span className="text-slate-300">•</span>
             <span>Multi-Branch Digital Timekeeping & Payroll System</span>
           </div>

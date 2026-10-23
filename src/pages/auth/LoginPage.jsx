@@ -293,7 +293,7 @@ export const LoginPage = () => {
             </div>
             <div>
               <h2 className="text-[17px] font-bold tracking-tight text-white leading-snug">
-                REDMART
+                REDDMART
               </h2>
               <p className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">
                 Multi-Branch Digital Timekeeping &amp; Payroll System
@@ -425,7 +425,7 @@ export const LoginPage = () => {
                     <span>Single Sign-In · All Roles</span>
                   </div>
                   <h2 className="text-2xl sm:text-[26px] font-bold text-white tracking-tight">
-                    Welcome to REDMART
+                    Welcome to REDDMART
                   </h2>
                   <p className="mt-1 text-[13px] text-slate-400">
                     Sign in with your Admin, Supervisor, or Employee account.
@@ -611,7 +611,7 @@ export const LoginPage = () => {
                         type="email"
                         value={regForm.email}
                         onChange={(e) => setRegForm({ ...regForm, email: e.target.value })}
-                        placeholder="name@redmart.enterprise"
+                        placeholder="name@reddmart.enterprise"
                         className="block w-full px-3.5 py-2.5 bg-[#081226] border border-slate-700/80 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition shadow-inner"
                       />
                     </div>

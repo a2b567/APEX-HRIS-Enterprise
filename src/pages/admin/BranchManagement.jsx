@@ -182,13 +182,13 @@ export const BranchManagement = () => {
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200">
               Multi-Branch Matrix
             </span>
-            <span className="text-xs text-slate-500 font-medium">Centrally Managing 5 RedMart Branches</span>
+            <span className="text-xs text-slate-500 font-medium">Centrally Managing 5 ReddMart Branches</span>
           </div>
           <h1 className="mt-1 text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
             Multi-Branch Management
           </h1>
           <p className="text-xs text-slate-500">
-            Centralized administration and supervisor alignment for 5 RedMart grocery branches. Oversee staff, rosters, and branch status.
+            Centralized administration and supervisor alignment for 5 ReddMart grocery branches. Oversee staff, rosters, and branch status.
           </p>
         </div>
 

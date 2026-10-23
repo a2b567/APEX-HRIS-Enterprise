@@ -121,7 +121,7 @@ export const AdminLoginPage = () => {
             </div>
             <div>
               <h2 className="text-lg font-black tracking-tight text-white leading-snug">
-                REDMART
+                REDDMART
               </h2>
               <p className="text-[10px] text-blue-400 uppercase tracking-widest font-mono font-bold">
                 MANAGEMENT &amp; ADMINISTRATIVE GATEWAY

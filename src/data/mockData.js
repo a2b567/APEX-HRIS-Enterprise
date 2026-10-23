@@ -1,5 +1,5 @@
 /**
- * REDMART: Multi-Branch Digital Timekeeping & Payroll System
+ * REDDMART: Multi-Branch Digital Timekeeping & Payroll System
  * Clean System Seed with 5 Centrally Managed Branches
  */
 
@@ -323,8 +323,8 @@ export const generateInitialAttendanceLogs = () => [];
 
 // Standard Company Policy & Payroll Settings
 export const INITIAL_SETTINGS = {
-  companyName: 'REDMART',
-  systemTitle: 'REDMART: Multi-Branch Digital Timekeeping & Payroll System',
+  companyName: 'REDDMART',
+  systemTitle: 'REDDMART: Multi-Branch Digital Timekeeping & Payroll System',
   companyTagline: 'Multi-Branch Digital Timekeeping & Payroll System',
   taxIdNumber: '',
   standardWorkHoursPerDay: 8,
