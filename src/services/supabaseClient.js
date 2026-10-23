@@ -17,8 +17,19 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   realtime: { params: { eventsPerSecond: 10 } },
 });
 
-export const isSupabaseConfigured = () =>
-  Boolean(SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_ANON_KEY !== 'public-anon-key-placeholder');
+export const isSupabaseConfigured = () => {
+  const syncEnabled =
+    typeof import.meta !== 'undefined' && import.meta.env
+      ? import.meta.env.VITE_ENABLE_SUPABASE_SYNC === 'true'
+      : process.env.VITE_ENABLE_SUPABASE_SYNC === 'true';
+  return Boolean(
+    syncEnabled &&
+    SUPABASE_URL &&
+    SUPABASE_ANON_KEY &&
+    SUPABASE_ANON_KEY !== 'public-anon-key-placeholder' &&
+    !SUPABASE_URL.includes('placeholder')
+  );
+};
 
 // ── Cross-device Broadcast Channel ───────────────────────────────────────────
 // When Device 1 writes data → calls broadcastDataChanged() → Device 2 gets notified instantly

@@ -41,7 +41,7 @@ export const AppRoutes = () => {
     <Routes>
       {/* Public Routes */}
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/admin/login" element={<AdminLoginPage />} />
+      <Route path="/admin/login" element={<Navigate to="/login" replace />} />
       <Route path="/kiosk" element={<KioskPage />} />
 
       {/* Protected App Shell */}

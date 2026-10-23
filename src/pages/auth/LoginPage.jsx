@@ -32,7 +32,7 @@ export const LoginPage = () => {
 
   // Employee Self-Service credentials
   const [email, setEmail] = useState('juan.cruz');
-  const [password, setPassword] = useState('EMP-001-01');
+  const [password, setPassword] = useState('Emp@123');
   const [showPassword, setShowPassword] = useState(false);
   const [trustDevice, setTrustDevice] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
@@ -72,22 +72,6 @@ export const LoginPage = () => {
     setErrorMessage('');
     setRecaptchaError('');
 
-    const cleanInput = email.trim().toLowerCase();
-
-    // Security guard: Prevent administrative & supervisor logins here - redirect them to Management Gateway
-    if (cleanInput === 'admin') {
-      setErrorMessage(
-        'Security Protocol: Administrator accounts must sign in via the Management & Administrative Gateway.'
-      );
-      return;
-    }
-    if (cleanInput === 'aron' || cleanInput.includes('supervisor')) {
-      setErrorMessage(
-        'Security Protocol: Branch Supervisor accounts must sign in via the Management & Administrative Gateway.'
-      );
-      return;
-    }
-
     if (!recaptchaVerified) {
       setRecaptchaError('Please check "I\'m not a robot" to complete security verification.');
       return;
@@ -95,17 +79,25 @@ export const LoginPage = () => {
 
     setSubmitting(true);
     try {
-      // Employee portal strictly enforces EMPLOYEE role
-      const result = await login(email, password, 'EMPLOYEE');
+      // Unified login: accepts Super Admin, Supervisor, and Employee
+      const result = await login(email, password);
       if (result.success) {
+        const userRole = result.user?.role;
         addToast({
           title: 'Welcome Back',
-          message: `Signed in as ${result.user?.name || 'Employee'}. Accessing Employee Portal.`,
+          message: `Signed in as ${result.user?.name || 'User'} (${userRole || 'Staff'}).`,
           type: 'success',
         });
-        navigate('/employee/dashboard');
+
+        if (userRole === 'SUPER_ADMIN' || userRole === 'ADMIN') {
+          navigate('/admin/dashboard');
+        } else if (userRole === 'SUPERVISOR') {
+          navigate('/supervisor/dashboard');
+        } else {
+          navigate('/employee/dashboard');
+        }
       } else {
-        setErrorMessage(result.message || 'Login failed. Check your employee credentials.');
+        setErrorMessage(result.message || 'Login failed. Check your credentials.');
       }
     } catch (err) {
       setErrorMessage(err.message || 'An unexpected error occurred.');
@@ -347,25 +339,7 @@ export const LoginPage = () => {
           RIGHT COLUMN: Sleek Dark Auth Card Container (#060c18)
          ───────────────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col justify-between p-6 sm:p-10 lg:p-12 xl:p-16 overflow-y-auto bg-[#060c18]">
-        {/* Top Quick Actions (Kiosk Mode & Admin/Supervisor Link) */}
-        <div className="flex justify-between items-center gap-3 mb-4">
-          <Link
-            to="/admin/login"
-            className="px-3.5 py-1.5 text-xs font-semibold text-blue-400 hover:text-blue-300 bg-[#0b1528] hover:bg-[#111e38] border border-slate-800/80 rounded-xl shadow-sm transition flex items-center gap-1.5"
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
-            <span>Management &amp; Admin Gateway →</span>
-          </Link>
 
-          <button
-            type="button"
-            onClick={() => navigate('/kiosk')}
-            className="px-3.5 py-1.5 text-xs font-semibold text-slate-300 hover:text-white bg-[#0b1528] hover:bg-[#111e38] border border-slate-800/80 rounded-xl shadow-sm transition flex items-center gap-1.5"
-          >
-            <Maximize2 className="w-3.5 h-3.5 text-blue-400" />
-            <span>Kiosk Mode</span>
-          </button>
-        </div>
 
         {/* Center Card Container */}
         <div className="w-full max-w-[520px] mx-auto my-auto">
@@ -410,16 +384,6 @@ export const LoginPage = () => {
                 <ShieldAlert className="w-4 h-4 shrink-0 text-rose-400" />
                 <div className="flex-1">
                   <span>{errorMessage}</span>
-                  {(errorMessage.includes('Administrator') || errorMessage.includes('Supervisor')) && (
-                    <div className="mt-1.5">
-                      <Link
-                        to="/admin/login"
-                        className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-400 hover:underline"
-                      >
-                        Go to Management Gateway →
-                      </Link>
-                    </div>
-                  )}
                 </div>
               </div>
             )}
@@ -429,14 +393,14 @@ export const LoginPage = () => {
                 {/* Header */}
                 <div>
                   <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-600/20 text-blue-300 text-[10px] font-bold uppercase tracking-wider mb-2 border border-blue-500/30">
-                    <User className="w-3 h-3 text-blue-400" />
-                    <span>Employee Self-Service Portal</span>
+                    <ShieldCheck className="w-3 h-3 text-blue-400" />
+                    <span>Single Sign-In · All Roles</span>
                   </div>
                   <h2 className="text-2xl sm:text-[26px] font-bold text-white tracking-tight">
-                    Welcome back
+                    Welcome to REDMART
                   </h2>
                   <p className="mt-1 text-[13px] text-slate-400">
-                    Enter your employee credentials to access your DTR, schedule &amp; payslips.
+                    Sign in with your Admin, Supervisor, or Employee account.
                   </p>
                 </div>
 
@@ -546,6 +510,8 @@ export const LoginPage = () => {
                       <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-300 font-medium">Terms of Service</a> apply.
                     </p>
                   </div>
+
+
 
                   <div className="text-center pt-1">
                     <button

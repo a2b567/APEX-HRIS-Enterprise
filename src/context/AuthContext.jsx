@@ -1,4 +1,4 @@
-﻿import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { INITIAL_USERS } from '../data/mockData';
 import { api } from '../services/api';
 import { rateLimiter } from '../security/rateLimiter';
@@ -45,11 +45,11 @@ export const AuthProvider = ({ children }) => {
     try {
       // 1. Attempt backend Go API login
       const backendRes = await api.auth.login(username.trim(), password);
-      if (backendRes.success && backendRes.data) {
+      if (backendRes.success && backendRes.data && (backendRes.data.token || backendRes.data.user)) {
         const apiData = backendRes.data;
-        const loggedUserRole = apiData.user?.role?.name || apiData.role || 'SUPER_ADMIN';
+        const loggedUserRole = apiData.user?.role?.name || apiData.role;
 
-        if (expectedRole) {
+        if (expectedRole && loggedUserRole) {
           const isRoleValid =
             (expectedRole === 'ADMIN' && (loggedUserRole === 'SUPER_ADMIN' || loggedUserRole === 'ADMIN')) ||
             (expectedRole === 'SUPERVISOR' && loggedUserRole === 'SUPERVISOR') ||
@@ -83,8 +83,29 @@ export const AuthProvider = ({ children }) => {
       console.warn('Backend login attempt failed, evaluating local mock auth:', err);
     }
 
-    // 2. Fetch from Supabase (cloud) + fallback
+    // 2. Fetch users from LocalStorage / Supabase / fallback
     let allUsers = [...INITIAL_USERS];
+    try {
+      const localUsersJson = localStorage.getItem('reddmart_users');
+      if (localUsersJson) {
+        const parsed = JSON.parse(localUsersJson);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Merge with initial users to ensure system default accounts always exist
+          const existingIds = new Set(parsed.map((u) => u.id));
+          const existingUsernames = new Set(parsed.map((u) => (u.username || '').toLowerCase()));
+          const combined = [...parsed];
+          INITIAL_USERS.forEach((initU) => {
+            if (!existingIds.has(initU.id) && !existingUsernames.has((initU.username || '').toLowerCase())) {
+              combined.push(initU);
+            }
+          });
+          allUsers = combined;
+        }
+      }
+    } catch (localErr) {
+      console.warn('[Auth] Could not read local users:', localErr);
+    }
+
     try {
       if (isSupabaseConfigured()) {
         const cloudUsers = await fetchUsersFromSupabase();

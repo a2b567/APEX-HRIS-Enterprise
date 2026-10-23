@@ -1,4 +1,4 @@
-﻿import { spawn } from 'child_process';
+import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import http from 'http';
@@ -11,20 +11,25 @@ const PORT = process.env.PORT || 8080;
 console.log(`[REDDMART Backend] Initializing runner on PORT=${PORT}...`);
 
 // Search for pre-compiled Go binary
+const isWin = process.platform === 'win32';
+const binName = isWin ? 'server.exe' : 'server';
 const possibleBins = [
+  path.join(__dirname, binName),
+  path.join(__dirname, 'GroceryBackend-main', binName),
+  path.join(__dirname, '..', binName),
   path.join(__dirname, 'server'),
   path.join(__dirname, 'GroceryBackend-main', 'server'),
-  path.join(__dirname, '..', 'server'),
 ];
 
 let binaryPath = possibleBins.find(p => fs.existsSync(p));
 
 if (binaryPath) {
   try {
-    fs.chmodSync(binaryPath, 0o755);
+    if (!isWin) fs.chmodSync(binaryPath, 0o755);
     console.log(`[REDDMART Backend] Launching Go binary at: ${binaryPath}`);
     
     const child = spawn(binaryPath, [], {
+      cwd: path.dirname(binaryPath),
       env: { ...process.env, PORT: String(PORT) },
       stdio: 'inherit'
     });
@@ -74,12 +79,12 @@ function startFallbackServer() {
       return;
     }
 
-    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
-      status: 'success',
+      status: 'error',
       service: 'REDDMART Enterprise Backend API',
       path: req.url,
-      message: 'API operational'
+      message: 'API route not handled by fallback server. Using client-side storage.'
     }));
   });
 

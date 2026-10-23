@@ -33,9 +33,33 @@ import {
 export const DataContext = createContext(null);
 
 export const DataProvider = ({ children }) => {
-  const [branches, setBranches] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [employees, setEmployees] = useState([]);
+  const [branches, setBranches] = useState(() => {
+    try {
+      const saved = localStorage.getItem('reddmart_branches');
+      return saved ? JSON.parse(saved) : INITIAL_BRANCHES;
+    } catch {
+      return INITIAL_BRANCHES;
+    }
+  });
+
+  const [users, setUsers] = useState(() => {
+    try {
+      const saved = localStorage.getItem('reddmart_users');
+      return saved ? JSON.parse(saved) : INITIAL_USERS;
+    } catch {
+      return INITIAL_USERS;
+    }
+  });
+
+  const [employees, setEmployees] = useState(() => {
+    try {
+      const saved = localStorage.getItem('reddmart_employees');
+      return saved ? JSON.parse(saved) : INITIAL_EMPLOYEES;
+    } catch {
+      return INITIAL_EMPLOYEES;
+    }
+  });
+
   const [attendanceLogs, setAttendanceLogs] = useState(() => {
     try {
       const saved = localStorage.getItem('reddmart_attendance_logs');
@@ -44,8 +68,33 @@ export const DataProvider = ({ children }) => {
       return generateInitialAttendanceLogs();
     }
   });
-  const [disbursements, setDisbursements] = useState({});
-  const [isLoading, setIsLoading] = useState(true);
+
+  const [disbursements, setDisbursements] = useState(() => {
+    try {
+      const saved = localStorage.getItem('reddmart_disbursements');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    try { localStorage.setItem('reddmart_branches', JSON.stringify(branches)); } catch (_) {}
+  }, [branches]);
+
+  useEffect(() => {
+    try { localStorage.setItem('reddmart_users', JSON.stringify(users)); } catch (_) {}
+  }, [users]);
+
+  useEffect(() => {
+    try { localStorage.setItem('reddmart_employees', JSON.stringify(employees)); } catch (_) {}
+  }, [employees]);
+
+  useEffect(() => {
+    try { localStorage.setItem('reddmart_disbursements', JSON.stringify(disbursements)); } catch (_) {}
+  }, [disbursements]);
 
   const attendanceLogsRef = useRef(attendanceLogs);
   useEffect(() => {
@@ -103,9 +152,6 @@ export const DataProvider = ({ children }) => {
   // ── Load all data from Supabase. Each table fetches INDEPENDENTLY. ──
   useEffect(() => {
     if (!isSupabaseConfigured()) {
-      setBranches(INITIAL_BRANCHES);
-      setUsers(INITIAL_USERS);
-      setEmployees(INITIAL_EMPLOYEES);
       setIsLoading(false);
       return;
     }
@@ -121,14 +167,14 @@ export const DataProvider = ({ children }) => {
           fetchDisbursementsFromSupabase(),
         ]);
 
-      if (empRes.status === 'fulfilled' && Array.isArray(empRes.value)) {
-        setEmployees(empRes.value.length > 0 ? empRes.value : prev => prev);
+      if (empRes.status === 'fulfilled' && Array.isArray(empRes.value) && empRes.value.length > 0) {
+        setEmployees(empRes.value);
       }
-      if (userRes.status === 'fulfilled' && Array.isArray(userRes.value)) {
-        setUsers(userRes.value.length > 0 ? userRes.value : INITIAL_USERS);
+      if (userRes.status === 'fulfilled' && Array.isArray(userRes.value) && userRes.value.length > 0) {
+        setUsers(userRes.value);
       }
-      if (branchRes.status === 'fulfilled' && Array.isArray(branchRes.value)) {
-        setBranches(branchRes.value.length > 0 ? branchRes.value : INITIAL_BRANCHES);
+      if (branchRes.status === 'fulfilled' && Array.isArray(branchRes.value) && branchRes.value.length > 0) {
+        setBranches(branchRes.value);
       }
       if (attendRes.status === 'fulfilled' && Array.isArray(attendRes.value)) {
         if (attendRes.value.length > 0) {
@@ -143,7 +189,7 @@ export const DataProvider = ({ children }) => {
           });
         }
       }
-      if (disburseRes.status === 'fulfilled') {
+      if (disburseRes.status === 'fulfilled' && disburseRes.value) {
         setDisbursements(disburseRes.value || {});
       }
     };
@@ -185,7 +231,14 @@ export const DataProvider = ({ children }) => {
     setShiftTemplates(INITIAL_SHIFTS);
     setSchedules(INITIAL_SCHEDULES);
     setAttendanceCorrections(INITIAL_CORRECTIONS);
+    setDisbursements({});
     try {
+      localStorage.removeItem('reddmart_branches');
+      localStorage.removeItem('reddmart_users');
+      localStorage.removeItem('reddmart_employees');
+      localStorage.removeItem('reddmart_attendance_logs');
+      localStorage.removeItem('reddmart_disbursements');
+      localStorage.removeItem('reddmart_settings');
       localStorage.removeItem('redmart_shift_templates');
       localStorage.removeItem('redmart_schedules');
       localStorage.removeItem('redmart_corrections');
@@ -532,7 +585,11 @@ export const DataProvider = ({ children }) => {
         };
 
         linkedUserId = nextUserId;
-        setUsers((prev) => [...prev, createdUser]);
+        setUsers((prev) => {
+          const updated = [...prev, createdUser];
+          try { localStorage.setItem('reddmart_users', JSON.stringify(updated)); } catch (_) {}
+          return updated;
+        });
       }
     }
 
@@ -556,7 +613,11 @@ export const DataProvider = ({ children }) => {
       idVerifiedBy: empData.idVerifiedBy || 'System Administrator',
     };
 
-    setEmployees((prev) => [...prev, newEmployee]);
+    setEmployees((prev) => {
+      const updated = [...prev, newEmployee];
+      try { localStorage.setItem('reddmart_employees', JSON.stringify(updated)); } catch (_) {}
+      return updated;
+    });
 
     if (isSupabaseConfigured()) {
       if (createdUser) {
@@ -764,10 +825,16 @@ export const DataProvider = ({ children }) => {
       phone: employee.phone || '',
     };
 
-    setUsers((prev) => [...prev, newUser]);
-    setEmployees((prev) =>
-      prev.map((e) => (e.id === employeeId ? { ...e, userId: nextUserId } : e))
-    );
+    setUsers((prev) => {
+      const updated = [...prev, newUser];
+      try { localStorage.setItem('reddmart_users', JSON.stringify(updated)); } catch (_) {}
+      return updated;
+    });
+    setEmployees((prev) => {
+      const updated = prev.map((e) => (e.id === employeeId ? { ...e, userId: nextUserId } : e));
+      try { localStorage.setItem('reddmart_employees', JSON.stringify(updated)); } catch (_) {}
+      return updated;
+    });
 
     if (isSupabaseConfigured()) {
       (async () => {
