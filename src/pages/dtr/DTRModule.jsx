@@ -51,8 +51,12 @@ export const DTRModule = () => {
   const [manualForm, setManualForm] = useState({
     employeeId: '',
     date: new Date().toISOString().split('T')[0],
-    timeIn: '08:00',
-    timeOut: '17:00',
+    in1: '08:00',
+    out1: '12:00',
+    in2: '13:00',
+    out2: '17:00',
+    in3: '',
+    out3: '',
     breakMinutes: 60,
     remarks: 'Manual Shift Entry',
     status: 'Present',
@@ -157,18 +161,27 @@ export const DTRModule = () => {
   };
 
   const handleExportCSV = () => {
-    const headers = ['ID', 'Date', 'Employee ID', 'Employee Name', 'Branch', 'Time In', 'Time Out', 'Reg Hours', 'OT Hours', 'Late (min)', 'Method', 'Status', 'Remarks'];
+    const headers = [
+      'ID', 'Date', 'Employee ID', 'Employee Name', 'Branch',
+      'In 1 (AM)', 'Out 1 (Lunch)', 'In 2 (PM)', 'Out 2 (Dismissal)', 'In 3 (OT In)', 'Out 3 (OT Out)',
+      'Reg Hours', 'OT Hours', 'Late (min)', 'Undertime (min)', 'Method', 'Status', 'Remarks'
+    ];
     const rows = filteredLogs.map((l) => [
       l.id,
       l.date,
       l.employeeId,
       `"${l.employeeName || ''}"`,
       l.branchId,
-      l.timeIn || '—',
-      l.timeOut || '—',
+      l.in1 || l.timeIn || '—',
+      l.out1 || (l.in2 ? '—' : l.timeOut) || '—',
+      l.in2 || '—',
+      l.out2 || '—',
+      l.in3 || '—',
+      l.out3 || '—',
       l.regularHours || 0,
       l.overtimeHours || 0,
       l.lateMinutes || 0,
+      l.undertimeMinutes || 0,
       l.method || 'MANUAL',
       l.status,
       `"${l.remarks || ''}"`,
@@ -376,62 +389,99 @@ export const DTRModule = () => {
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-200">
               <tr>
-                <th className="py-3.5 px-4">Date</th>
-                <th className="py-3.5 px-4">Employee</th>
-                {isSuperAdmin && <th className="py-3.5 px-4">Branch</th>}
-                <th className="py-3.5 px-4">Time In</th>
-                <th className="py-3.5 px-4">Time Out</th>
-                <th className="py-3.5 px-4">Reg Hours</th>
-                <th className="py-3.5 px-4">OT</th>
-                <th className="py-3.5 px-4">Late (mins)</th>
-                <th className="py-3.5 px-4">Method</th>
-                <th className="py-3.5 px-4">Status</th>
-                <th className="py-3.5 px-4">Remarks</th>
-                {!isEmployee && <th className="py-3.5 px-4 text-right no-print">Action</th>}
+                <th rowSpan="2" className="py-3 px-3 align-middle">Date</th>
+                <th rowSpan="2" className="py-3 px-3 align-middle">Employee</th>
+                {isSuperAdmin && <th rowSpan="2" className="py-3 px-3 align-middle">Branch</th>}
+                <th colSpan="2" className="py-1.5 px-2 text-center bg-blue-50/70 text-blue-900 border-x border-slate-200 font-bold">
+                  Session 1 (AM)
+                </th>
+                <th colSpan="2" className="py-1.5 px-2 text-center bg-indigo-50/70 text-indigo-900 border-r border-slate-200 font-bold">
+                  Session 2 (PM)
+                </th>
+                <th colSpan="2" className="py-1.5 px-2 text-center bg-amber-50/70 text-amber-900 border-r border-slate-200 font-bold">
+                  Session 3 (OT)
+                </th>
+                <th rowSpan="2" className="py-3 px-2 text-center align-middle">Reg Hrs</th>
+                <th rowSpan="2" className="py-3 px-2 text-center align-middle">OT</th>
+                <th rowSpan="2" className="py-3 px-2 text-center align-middle">Late</th>
+                <th rowSpan="2" className="py-3 px-2 text-center align-middle">Method</th>
+                <th rowSpan="2" className="py-3 px-2 text-center align-middle">Status</th>
+                <th rowSpan="2" className="py-3 px-3 align-middle">Remarks</th>
+                {!isEmployee && <th rowSpan="2" className="py-3 px-3 text-right align-middle no-print">Action</th>}
+              </tr>
+              <tr>
+                <th className="py-1.5 px-2 text-center bg-emerald-50/50 text-emerald-700 font-bold border-l border-slate-200">In 1</th>
+                <th className="py-1.5 px-2 text-center bg-rose-50/50 text-rose-700 font-bold border-r border-slate-200">Out 1</th>
+                <th className="py-1.5 px-2 text-center bg-emerald-50/50 text-emerald-700 font-bold">In 2</th>
+                <th className="py-1.5 px-2 text-center bg-rose-50/50 text-rose-700 font-bold border-r border-slate-200">Out 2</th>
+                <th className="py-1.5 px-2 text-center bg-emerald-50/50 text-emerald-700 font-bold">In 3</th>
+                <th className="py-1.5 px-2 text-center bg-rose-50/50 text-rose-700 font-bold border-r border-slate-200">Out 3</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredLogs.map((log) => {
                 const branchObj = branches.find((b) => b.id === log.branchId);
+                const in1Val = log.in1 || log.timeIn;
+                const out1Val = log.out1 || (!log.in2 && log.timeOut ? log.timeOut : null);
+                const in2Val = log.in2;
+                const out2Val = log.out2;
+                const in3Val = log.in3;
+                const out3Val = log.out3;
 
                 return (
                   <tr key={log.id} className="hover:bg-slate-50/80 transition">
-                    <td className="py-3 px-4 font-semibold text-slate-900 whitespace-nowrap">
+                    <td className="py-3 px-3 font-semibold text-slate-900 whitespace-nowrap">
                       {formatDate(log.date)}
                     </td>
 
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-3">
                       <div className="font-semibold text-slate-900">{log.employeeName}</div>
                       <div className="font-mono text-[10px] text-blue-600">{log.employeeId}</div>
                     </td>
 
                     {isSuperAdmin && (
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-3">
                         <span className="font-mono text-[11px] text-slate-600">{branchObj?.code || log.branchId}</span>
                       </td>
                     )}
 
-                    <td className="py-3 px-4 font-mono font-medium text-emerald-600">
-                      {formatTime(log.timeIn)}
+                    {/* Session 1 (Morning) */}
+                    <td className="py-2.5 px-2 text-center font-mono font-medium text-emerald-600 bg-emerald-50/20 border-l border-slate-100 whitespace-nowrap">
+                      {in1Val ? formatTime(in1Val) : '—'}
+                    </td>
+                    <td className="py-2.5 px-2 text-center font-mono font-medium text-rose-600 bg-rose-50/20 border-r border-slate-100 whitespace-nowrap">
+                      {out1Val ? formatTime(out1Val) : '—'}
                     </td>
 
-                    <td className="py-3 px-4 font-mono font-medium text-blue-600">
-                      {formatTime(log.timeOut)}
+                    {/* Session 2 (Afternoon) */}
+                    <td className="py-2.5 px-2 text-center font-mono font-medium text-emerald-600 bg-emerald-50/20 whitespace-nowrap">
+                      {in2Val ? formatTime(in2Val) : '—'}
+                    </td>
+                    <td className="py-2.5 px-2 text-center font-mono font-medium text-rose-600 bg-rose-50/20 border-r border-slate-100 whitespace-nowrap">
+                      {out2Val ? formatTime(out2Val) : '—'}
                     </td>
 
-                    <td className="py-3 px-4 font-mono text-slate-700">
+                    {/* Session 3 (Overtime) */}
+                    <td className="py-2.5 px-2 text-center font-mono font-medium text-emerald-600 bg-emerald-50/20 whitespace-nowrap">
+                      {in3Val ? formatTime(in3Val) : '—'}
+                    </td>
+                    <td className="py-2.5 px-2 text-center font-mono font-medium text-rose-600 bg-rose-50/20 border-r border-slate-100 whitespace-nowrap">
+                      {out3Val ? formatTime(out3Val) : '—'}
+                    </td>
+
+                    <td className="py-3 px-2 text-center font-mono text-slate-700">
                       {formatHours(log.regularHours)}
                     </td>
 
-                    <td className="py-3 px-4 font-mono font-medium text-amber-600">
+                    <td className="py-3 px-2 text-center font-mono font-medium text-amber-600">
                       {log.overtimeHours > 0 ? `+${log.overtimeHours}h` : '0.0h'}
                     </td>
 
-                    <td className="py-3 px-4 font-mono font-medium text-rose-600">
+                    <td className="py-3 px-2 text-center font-mono font-medium text-rose-600">
                       {log.lateMinutes > 0 ? `${log.lateMinutes}m` : '0m'}
                     </td>
 
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-2 text-center">
                       <span
                         className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
                           log.method === 'QR'
@@ -444,18 +494,18 @@ export const DTRModule = () => {
                       </span>
                     </td>
 
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-2 text-center">
                       <span className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${getStatusBadge(log.status)}`}>
                         {log.status}
                       </span>
                     </td>
 
-                    <td className="py-3 px-4 text-slate-500 text-[11px] max-w-[140px] truncate">
+                    <td className="py-3 px-3 text-slate-500 text-[11px] max-w-[140px] truncate">
                       {log.remarks || '—'}
                     </td>
 
                     {!isEmployee && (
-                      <td className="py-3 px-4 text-right no-print">
+                      <td className="py-3 px-3 text-right no-print">
                         <button
                           onClick={() => deleteAttendanceLog(log.id)}
                           className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
@@ -519,29 +569,114 @@ export const DTRModule = () => {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Time In
-                </label>
-                <input
-                  type="time"
-                  value={manualForm.timeIn}
-                  onChange={(e) => setManualForm({ ...manualForm, timeIn: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 text-sm text-slate-800 rounded-xl p-2.5 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
+            {/* Session 1 */}
+            <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 space-y-2">
+              <span className="text-[11px] font-bold text-blue-900 uppercase tracking-wider">Session 1 (Morning Shift)</span>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">In 1 (AM Arrival)</label>
+                  <input
+                    type="time"
+                    value={manualForm.in1 || ''}
+                    onChange={(e) => setManualForm({ ...manualForm, in1: e.target.value })}
+                    className="w-full bg-white border border-slate-200 text-xs text-slate-800 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Out 1 (Lunch Out)</label>
+                  <input
+                    type="time"
+                    value={manualForm.out1 || ''}
+                    onChange={(e) => setManualForm({ ...manualForm, out1: e.target.value })}
+                    className="w-full bg-white border border-slate-200 text-xs text-slate-800 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 font-mono"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Time Out
-                </label>
-                <input
-                  type="time"
-                  value={manualForm.timeOut}
-                  onChange={(e) => setManualForm({ ...manualForm, timeOut: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 text-sm text-slate-800 rounded-xl p-2.5 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
+            </div>
+
+            {/* Session 2 */}
+            <div className="p-3 bg-indigo-50/50 rounded-xl border border-indigo-100 space-y-2">
+              <span className="text-[11px] font-bold text-indigo-900 uppercase tracking-wider">Session 2 (Afternoon Shift)</span>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">In 2 (Lunch Return)</label>
+                  <input
+                    type="time"
+                    value={manualForm.in2 || ''}
+                    onChange={(e) => setManualForm({ ...manualForm, in2: e.target.value })}
+                    className="w-full bg-white border border-slate-200 text-xs text-slate-800 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Out 2 (Dismissal)</label>
+                  <input
+                    type="time"
+                    value={manualForm.out2 || ''}
+                    onChange={(e) => setManualForm({ ...manualForm, out2: e.target.value })}
+                    className="w-full bg-white border border-slate-200 text-xs text-slate-800 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 font-mono"
+                  />
+                </div>
               </div>
+            </div>
+
+            {/* Session 3 */}
+            <div className="p-3 bg-amber-50/50 rounded-xl border border-amber-100 space-y-2">
+              <span className="text-[11px] font-bold text-amber-900 uppercase tracking-wider">Session 3 (Overtime — Optional)</span>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">In 3 (OT Start)</label>
+                  <input
+                    type="time"
+                    value={manualForm.in3 || ''}
+                    onChange={(e) => setManualForm({ ...manualForm, in3: e.target.value })}
+                    className="w-full bg-white border border-slate-200 text-xs text-slate-800 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Out 3 (OT End)</label>
+                  <input
+                    type="time"
+                    value={manualForm.out3 || ''}
+                    onChange={(e) => setManualForm({ ...manualForm, out3: e.target.value })}
+                    className="w-full bg-white border border-slate-200 text-xs text-slate-800 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Presets */}
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-slate-500 font-semibold uppercase">Presets:</span>
+              <button
+                type="button"
+                onClick={() => setManualForm({
+                  ...manualForm,
+                  in1: '08:00',
+                  out1: '12:00',
+                  in2: '13:00',
+                  out2: '17:00',
+                  in3: '',
+                  out3: '',
+                })}
+                className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-[10px] text-slate-700 font-semibold"
+              >
+                Standard 8-5
+              </button>
+              <button
+                type="button"
+                onClick={() => setManualForm({
+                  ...manualForm,
+                  in1: '08:00',
+                  out1: '12:00',
+                  in2: '13:00',
+                  out2: '17:00',
+                  in3: '17:30',
+                  out3: '19:30',
+                })}
+                className="px-2 py-1 rounded bg-amber-100 hover:bg-amber-200 text-[10px] text-amber-800 font-semibold"
+              >
+                With 2h Overtime
+              </button>
             </div>
 
             <div>

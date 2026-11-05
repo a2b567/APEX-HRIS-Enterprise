@@ -1003,7 +1003,14 @@ export const DataProvider = ({ children }) => {
   };
 
   /**
-   * QR SCAN ATTENDANCE ENGINE
+   * QR SCAN ATTENDANCE ENGINE (3 TIMES IN & OUT SUPPORT)
+   * 6 punches per day:
+   * 1. In 1 (Morning Check-In)
+   * 2. Out 1 (Lunch Break Out)
+   * 3. In 2 (Afternoon Check-In / Lunch Return)
+   * 4. Out 2 (Shift Dismissal Out)
+   * 5. In 3 (Overtime In)
+   * 6. Out 3 (Overtime Out)
    */
   const recordQRScan = (qrString, scannerBranchId) => {
     const parsed = parseQRPayload(qrString);
@@ -1059,14 +1066,6 @@ export const DataProvider = ({ children }) => {
     const currentSettings = settingsRef.current || settings;
     const currentShift = currentSettings?.defaultShift || { startTime: '08:00', endTime: '17:00', gracePeriodMinutes: 15 };
 
-    const formatTime12 = (hhmm) => {
-      if (!hhmm) return '';
-      const [h, m] = hhmm.split(':').map(Number);
-      const ampm = h >= 12 ? 'PM' : 'AM';
-      const h12 = h % 12 || 12;
-      return `${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
-    };
-
     const currentLogs = [...(attendanceLogsRef.current || [])];
     const existingIndex = currentLogs.findIndex(
       (log) =>
@@ -1077,155 +1076,197 @@ export const DataProvider = ({ children }) => {
 
     const existingLog = existingIndex >= 0 ? currentLogs[existingIndex] : null;
 
-    // FIRST SCAN: TIME IN
-    if (!existingLog || !existingLog.timeIn) {
-      const calc = calculateTimeEntry(timeHHMM, null, 60, currentShift);
-      const status = calc.lateMinutes > 0 ? 'Late' : 'Present';
-
-      const newLog = {
-        id: `ATT-${employee.id}-${todayStr}`,
-        employeeId: employee.id,
-        employeeName: employee.name,
-        branchId: employee.branchId,
-        date: todayStr,
-        timeIn: timeHHMM,
-        timeOut: null,
-        breakMinutes: 60,
-        regularHours: 0,
-        overtimeHours: 0,
-        lateMinutes: calc.lateMinutes,
-        undertimeMinutes: 0,
-        status,
-        method: 'QR',
-        remarks: 'QR Badge Check-In',
-        isManual: false,
-      };
-
-      let nextLogs;
-      if (existingIndex >= 0) {
-        nextLogs = [...currentLogs];
-        nextLogs[existingIndex] = { ...nextLogs[existingIndex], ...newLog };
-      } else {
-        nextLogs = [newLog, ...currentLogs];
-      }
-
-      attendanceLogsRef.current = nextLogs;
-      setAttendanceLogs(nextLogs);
-      try { localStorage.setItem('reddmart_attendance_logs', JSON.stringify(nextLogs)); } catch (_) {}
-      logAttendanceToSupabase(newLog);
-      try { broadcastDataChanged(); } catch (_) {}
-
-      const scanEntry = {
-        id: `scan-${Date.now()}`,
-        employeeId: employee.id,
-        employeeName: employee.name,
-        branchId: employee.branchId,
-        action: 'TIME_IN',
-        time: displayTime,
-        timestamp: now.toISOString(),
-        status,
-        method: 'QR',
-      };
-      setLiveScanFeed((prev) => [scanEntry, ...prev.slice(0, 19)]);
-
-      if (status === 'Late') {
-        try { soundFeedback.playWarning(); } catch (e) {}
-      } else {
-        try { soundFeedback.playSuccess(); } catch (e) {}
-      }
-
-      return {
-        success: true,
-        action: 'TIME_IN',
-        status,
-        time: displayTime,
-        lateMinutes: calc.lateMinutes,
-        employee,
-        message: `Time In recorded for ${employee.name} at ${displayTime} (${status === 'Late' ? `${calc.lateMinutes} mins late` : 'On Time'}).`,
-      };
-    }
-
-    // SECOND SCAN: TIME OUT
-    if (existingLog.timeIn && !existingLog.timeOut) {
-      const shiftEndTime = currentShift?.endTime || '17:00';
-      const [nowH, nowM] = timeHHMM.split(':').map(Number);
-      const [shiftEndH, shiftEndM] = shiftEndTime.split(':').map(Number);
-      const currentTotalM = nowH * 60 + nowM;
-      const shiftEndTotalM = shiftEndH * 60 + shiftEndM;
-
-      if (currentTotalM < shiftEndTotalM) {
-        try { soundFeedback.playError(); } catch (e) {}
-        const formattedEndTime = formatTime12(shiftEndTime);
+    // Guard against immediate duplicate scans (camera double-read debounce of 3 seconds)
+    if (existingLog?.lastScanAt) {
+      const elapsedMs = now.getTime() - new Date(existingLog.lastScanAt).getTime();
+      if (elapsedMs < 3000) {
         return {
           success: false,
-          reason: 'EARLY_TIMEOUT_BLOCKED',
+          reason: 'DEBOUNCE',
           employee,
-          message: `Early Time Out blocked: Shift dismissal is scheduled at ${formattedEndTime}. Current time is ${displayTime}. Please scan at the scheduled dismissal time.`,
+          message: 'Duplicate scan prevented: please wait 3 seconds before next punch.',
         };
       }
+    }
 
-      const calc = calculateTimeEntry(existingLog.timeIn, timeHHMM, existingLog.breakMinutes || 60, currentShift);
+    // Existing punches resolution (with legacy single timeIn/timeOut compatibility)
+    let in1 = existingLog?.in1 || existingLog?.timeIn || null;
+    let out1 = existingLog?.out1 || (existingLog?.in2 ? null : existingLog?.timeOut) || null;
+    let in2 = existingLog?.in2 || null;
+    let out2 = existingLog?.out2 || null;
+    let in3 = existingLog?.in3 || null;
+    let out3 = existingLog?.out3 || null;
 
-      const updatedRecord = {
-        ...existingLog,
-        timeOut: timeHHMM,
-        regularHours: calc.regularHours,
-        overtimeHours: calc.overtimeHours,
-        undertimeMinutes: calc.undertimeMinutes,
-        status: calc.status,
-        method: 'QR',
-        remarks: 'QR Badge Check-Out',
-      };
+    let stepAction = '';
+    let stepLabel = '';
+    let stepShortLabel = '';
+    let stepType = ''; // 'IN' or 'OUT'
+    let sessionNum = 1;
+    let stepMessage = '';
 
-      const nextLogs = [...currentLogs];
-      nextLogs[existingIndex] = updatedRecord;
-      attendanceLogsRef.current = nextLogs;
-      setAttendanceLogs(nextLogs);
-      try { localStorage.setItem('reddmart_attendance_logs', JSON.stringify(nextLogs)); } catch (_) {}
-      logAttendanceToSupabase(updatedRecord);
-      try { broadcastDataChanged(); } catch (_) {}
-
-      const scanEntry = {
-        id: `scan-${Date.now()}`,
-        employeeId: employee.id,
-        employeeName: employee.name,
-        branchId: employee.branchId,
-        action: 'TIME_OUT',
-        time: displayTime,
-        timestamp: now.toISOString(),
-        status: calc.status,
-        method: 'QR',
-      };
-      setLiveScanFeed((prev) => [scanEntry, ...prev.slice(0, 19)]);
-
-      try { soundFeedback.playSuccess(); } catch (e) {}
-
+    if (!in1) {
+      // 1. IN 1 (Morning Check-In)
+      in1 = timeHHMM;
+      stepAction = 'TIME_IN_1';
+      stepLabel = 'Time In 1 (Morning Arrival)';
+      stepShortLabel = 'In 1';
+      stepType = 'IN';
+      sessionNum = 1;
+    } else if (!out1) {
+      // 2. OUT 1 (Lunch Break Out)
+      out1 = timeHHMM;
+      stepAction = 'TIME_OUT_1';
+      stepLabel = 'Time Out 1 (Lunch Break Out)';
+      stepShortLabel = 'Out 1';
+      stepType = 'OUT';
+      sessionNum = 1;
+    } else if (!in2) {
+      // 3. IN 2 (Afternoon / Lunch Return)
+      in2 = timeHHMM;
+      stepAction = 'TIME_IN_2';
+      stepLabel = 'Time In 2 (Lunch Return / Afternoon)';
+      stepShortLabel = 'In 2';
+      stepType = 'IN';
+      sessionNum = 2;
+    } else if (!out2) {
+      // 4. OUT 2 (Regular Shift Dismissal)
+      out2 = timeHHMM;
+      stepAction = 'TIME_OUT_2';
+      stepLabel = 'Time Out 2 (Shift Dismissal)';
+      stepShortLabel = 'Out 2';
+      stepType = 'OUT';
+      sessionNum = 2;
+    } else if (!in3) {
+      // 5. IN 3 (Overtime Check-In)
+      in3 = timeHHMM;
+      stepAction = 'TIME_IN_3';
+      stepLabel = 'Time In 3 (Overtime In)';
+      stepShortLabel = 'In 3';
+      stepType = 'IN';
+      sessionNum = 3;
+    } else if (!out3) {
+      // 6. OUT 3 (Overtime Check-Out)
+      out3 = timeHHMM;
+      stepAction = 'TIME_OUT_3';
+      stepLabel = 'Time Out 3 (Overtime Out)';
+      stepShortLabel = 'Out 3';
+      stepType = 'OUT';
+      sessionNum = 3;
+    } else {
+      // 7. ALL 3 SESSIONS (6 PUNCHES) ARE ALREADY COMPLETED
+      try { soundFeedback.playError(); } catch (e) {}
       return {
-        success: true,
-        action: 'TIME_OUT',
-        status: calc.status,
-        time: displayTime,
-        totalHours: calc.regularHours,
-        overtimeHours: calc.overtimeHours,
+        success: false,
+        reason: 'ALREADY_COMPLETED',
         employee,
-        message: `Time Out recorded for ${employee.name} at ${displayTime}. Total rendered: ${calc.regularHours} hrs${calc.overtimeHours > 0 ? ` (+${calc.overtimeHours} hrs OT)` : ''}.`,
+        message: `Daily scan limit reached: ${employee.name} has completed all 3 In & Out sessions for today (6 logs recorded).`,
       };
     }
 
-    // THIRD SCAN OR MORE: BLOCKED (TWICE A DAY LIMIT REACHED)
-    try { soundFeedback.playError(); } catch (e) {}
+    const updatedPunches = { in1, out1, in2, out2, in3, out3 };
+    const calc = calculateTimeEntry(updatedPunches, currentShift);
+
+    // Formulate descriptive success feedback
+    if (stepAction === 'TIME_IN_1') {
+      stepMessage = `Time In 1 (Morning) recorded for ${employee.name} at ${displayTime} (${calc.lateMinutes > 0 ? `${calc.lateMinutes} mins late` : 'On Time'}). [1 of 3 In/Out pairs]`;
+    } else if (stepAction === 'TIME_OUT_1') {
+      stepMessage = `Time Out 1 (Lunch Out) recorded for ${employee.name} at ${displayTime}. Have a great lunch! [1 of 3 pairs completed]`;
+    } else if (stepAction === 'TIME_IN_2') {
+      stepMessage = `Time In 2 (Afternoon Return) recorded for ${employee.name} at ${displayTime}. Welcome back! [2 of 3 In/Out pairs]`;
+    } else if (stepAction === 'TIME_OUT_2') {
+      stepMessage = `Time Out 2 (Shift Dismissal) recorded for ${employee.name} at ${displayTime}. Rendered: ${calc.regularHours}h. [2 of 3 pairs completed]`;
+    } else if (stepAction === 'TIME_IN_3') {
+      stepMessage = `Time In 3 (Overtime In) recorded for ${employee.name} at ${displayTime}. [3 of 3 In/Out pairs]`;
+    } else if (stepAction === 'TIME_OUT_3') {
+      stepMessage = `Time Out 3 (Overtime Out) recorded for ${employee.name} at ${displayTime}. Day complete! Total: ${calc.regularHours}h reg + ${calc.overtimeHours}h OT.`;
+    }
+
+    const updatedLog = {
+      id: existingLog?.id || `ATT-${employee.id}-${todayStr}`,
+      employeeId: employee.id,
+      employeeName: employee.name,
+      branchId: employee.branchId,
+      date: todayStr,
+      timeIn: in1, // backward compatibility
+      timeOut: out3 || out2 || out1 || null, // backward compatibility
+      in1,
+      out1,
+      in2,
+      out2,
+      in3,
+      out3,
+      breakMinutes: 60,
+      regularHours: calc.regularHours,
+      overtimeHours: calc.overtimeHours,
+      lateMinutes: calc.lateMinutes,
+      undertimeMinutes: calc.undertimeMinutes,
+      status: calc.status,
+      method: 'QR',
+      remarks: stepLabel,
+      isManual: false,
+      lastScanAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    };
+
+    let nextLogs;
+    if (existingIndex >= 0) {
+      nextLogs = [...currentLogs];
+      nextLogs[existingIndex] = updatedLog;
+    } else {
+      nextLogs = [updatedLog, ...currentLogs];
+    }
+
+    attendanceLogsRef.current = nextLogs;
+    setAttendanceLogs(nextLogs);
+    try { localStorage.setItem('reddmart_attendance_logs', JSON.stringify(nextLogs)); } catch (_) {}
+    logAttendanceToSupabase(updatedLog);
+    try { broadcastDataChanged(); } catch (_) {}
+
+    const scanEntry = {
+      id: `scan-${Date.now()}`,
+      employeeId: employee.id,
+      employeeName: employee.name,
+      branchId: employee.branchId,
+      action: stepAction,
+      shortLabel: stepShortLabel,
+      stepLabel,
+      stepType,
+      sessionNum,
+      time: displayTime,
+      timestamp: now.toISOString(),
+      status: calc.status,
+      method: 'QR',
+    };
+    setLiveScanFeed((prev) => [scanEntry, ...prev.slice(0, 19)]);
+
+    if (stepAction === 'TIME_IN_1' && calc.lateMinutes > 0) {
+      try { soundFeedback.playWarning(); } catch (e) {}
+    } else {
+      try { soundFeedback.playSuccess(); } catch (e) {}
+    }
+
     return {
-      success: false,
-      reason: 'ALREADY_COMPLETED',
+      success: true,
+      action: stepAction,
+      shortLabel: stepShortLabel,
+      stepLabel,
+      stepType,
+      sessionNum,
+      status: calc.status,
+      time: displayTime,
+      lateMinutes: calc.lateMinutes,
+      regularHours: calc.regularHours,
+      overtimeHours: calc.overtimeHours,
+      punches: updatedPunches,
       employee,
-      message: `Daily scan limit reached: ${employee.name} has already completed Time In (${existingLog.timeIn}) and Time Out (${existingLog.timeOut}) for today (Limit: 1 In and 1 Out per day).`,
+      message: stepMessage,
     };
   };
 
   /**
-   * MANUAL DTR / ATTENDANCE RECORD ACTIONS
+   * MANUAL DTR / ATTENDANCE RECORD ACTIONS (Supports 3 In/Out pairs)
    */
-  const recordPunch = (employeeId, type = 'IN', customTime = null) => {
+  const recordPunch = (employeeId, type = 'AUTO', customTime = null) => {
     const now = new Date();
     const localYear = now.getFullYear();
     const localMonth = String(now.getMonth() + 1).padStart(2, '0');
@@ -1239,110 +1280,120 @@ export const DataProvider = ({ children }) => {
 
     const currentShift = settingsRef.current?.defaultShift || settings?.defaultShift || { startTime: '08:00', endTime: '17:00', gracePeriodMinutes: 15 };
 
-    const existingIndex = attendanceLogs.findIndex(
+    const currentLogs = [...(attendanceLogsRef.current || attendanceLogs || [])];
+    const existingIndex = currentLogs.findIndex(
       (log) => log.employeeId === employeeId && log.date === todayStr
     );
+    const existingLog = existingIndex >= 0 ? currentLogs[existingIndex] : null;
 
-    if (type === 'IN') {
-      if (existingIndex >= 0 && attendanceLogs[existingIndex].timeIn) {
-        return { success: false, message: 'Employee has already punched in for today.' };
+    let in1 = existingLog?.in1 || existingLog?.timeIn || null;
+    let out1 = existingLog?.out1 || (existingLog?.in2 ? null : existingLog?.timeOut) || null;
+    let in2 = existingLog?.in2 || null;
+    let out2 = existingLog?.out2 || null;
+    let in3 = existingLog?.in3 || null;
+    let out3 = existingLog?.out3 || null;
+
+    let stepAction = '';
+    let stepLabel = '';
+
+    // If type is IN or AUTO: find next open IN punch
+    if (type === 'IN' || (type === 'AUTO' && (!in1 || (out1 && !in2) || (out2 && !in3)))) {
+      if (!in1) {
+        in1 = timeHHMM;
+        stepAction = 'TIME_IN_1';
+        stepLabel = 'Manual Punch In 1 (Morning)';
+      } else if (out1 && !in2) {
+        in2 = timeHHMM;
+        stepAction = 'TIME_IN_2';
+        stepLabel = 'Manual Punch In 2 (Afternoon)';
+      } else if (out2 && !in3) {
+        in3 = timeHHMM;
+        stepAction = 'TIME_IN_3';
+        stepLabel = 'Manual Punch In 3 (Overtime)';
+      } else {
+        return { success: false, message: 'Active punch in session already open. Please punch out first.' };
       }
+    } else {
+      // OUT or AUTO (when currently punched in)
+      if (in1 && !out1) {
+        out1 = timeHHMM;
+        stepAction = 'TIME_OUT_1';
+        stepLabel = 'Manual Punch Out 1 (Lunch)';
+      } else if (in2 && !out2) {
+        out2 = timeHHMM;
+        stepAction = 'TIME_OUT_2';
+        stepLabel = 'Manual Punch Out 2 (Dismissal)';
+      } else if (in3 && !out3) {
+        out3 = timeHHMM;
+        stepAction = 'TIME_OUT_3';
+        stepLabel = 'Manual Punch Out 3 (Overtime Out)';
+      } else {
+        return { success: false, message: 'No open Punch In found. Please punch in first.' };
+      }
+    }
 
-      const calc = calculateTimeEntry(timeHHMM, null, 60, currentShift);
-      const status = calc.lateMinutes > 0 ? 'Late' : 'Present';
+    const updatedPunches = { in1, out1, in2, out2, in3, out3 };
+    const calc = calculateTimeEntry(updatedPunches, currentShift);
 
-      const newLog = {
-        id: `ATT-${employeeId}-${todayStr}`,
+    const updatedLog = {
+      id: existingLog?.id || `ATT-${employeeId}-${todayStr}`,
+      employeeId: employee.id,
+      employeeName: employee.name,
+      branchId: employee.branchId,
+      date: todayStr,
+      timeIn: in1,
+      timeOut: out3 || out2 || out1 || null,
+      in1,
+      out1,
+      in2,
+      out2,
+      in3,
+      out3,
+      breakMinutes: 60,
+      regularHours: calc.regularHours,
+      overtimeHours: calc.overtimeHours,
+      lateMinutes: calc.lateMinutes,
+      undertimeMinutes: calc.undertimeMinutes,
+      status: calc.status,
+      method: 'MANUAL',
+      remarks: stepLabel,
+      isManual: true,
+      lastScanAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    };
+
+    let nextLogs;
+    if (existingIndex >= 0) {
+      nextLogs = [...currentLogs];
+      nextLogs[existingIndex] = updatedLog;
+    } else {
+      nextLogs = [updatedLog, ...currentLogs];
+    }
+
+    attendanceLogsRef.current = nextLogs;
+    setAttendanceLogs(nextLogs);
+    try { localStorage.setItem('reddmart_attendance_logs', JSON.stringify(nextLogs)); } catch (_) {}
+    logAttendanceToSupabase(updatedLog);
+    try { broadcastDataChanged(); } catch (_) {}
+
+    setLiveScanFeed((prev) => [
+      {
+        id: `scan-${Date.now()}`,
         employeeId: employee.id,
         employeeName: employee.name,
         branchId: employee.branchId,
-        date: todayStr,
-        timeIn: timeHHMM,
-        timeOut: null,
-        breakMinutes: 60,
-        regularHours: 0,
-        overtimeHours: 0,
-        lateMinutes: calc.lateMinutes,
-        undertimeMinutes: 0,
-        status,
-        method: 'MANUAL',
-        remarks: 'Manual Button Punch In',
-        isManual: true,
-      };
-
-      let nextLogs;
-      if (existingIndex >= 0) {
-        nextLogs = [...attendanceLogs];
-        nextLogs[existingIndex] = { ...nextLogs[existingIndex], ...newLog };
-      } else {
-        nextLogs = [newLog, ...attendanceLogs];
-      }
-      attendanceLogsRef.current = nextLogs;
-      setAttendanceLogs(nextLogs);
-      try { localStorage.setItem('reddmart_attendance_logs', JSON.stringify(nextLogs)); } catch (_) {}
-      logAttendanceToSupabase(newLog);
-      try { broadcastDataChanged(); } catch (_) {}
-
-      setLiveScanFeed((prev) => [
-        {
-          id: `scan-${Date.now()}`,
-          employeeId: employee.id,
-          employeeName: employee.name,
-          branchId: employee.branchId,
-          action: 'TIME_IN',
-          time: displayTime,
-          timestamp: now.toISOString(),
-          status,
-          method: 'MANUAL',
-        },
-        ...prev.slice(0, 19),
-      ]);
-
-      return { success: true, message: `Time In recorded at ${timeHHMM}` };
-    } else {
-      if (existingIndex < 0 || !attendanceLogs[existingIndex].timeIn) {
-        return { success: false, message: 'No Time In record found for today. Please punch in first.' };
-      }
-
-      const currentRecord = attendanceLogs[existingIndex];
-      const calc = calculateTimeEntry(currentRecord.timeIn, timeHHMM, currentRecord.breakMinutes || 60, currentShift);
-
-      const updatedRecord = {
-        ...currentRecord,
-        timeOut: timeHHMM,
-        regularHours: calc.regularHours,
-        overtimeHours: calc.overtimeHours,
-        undertimeMinutes: calc.undertimeMinutes,
+        action: stepAction,
+        shortLabel: stepAction.replace('TIME_', '').replace('_', ' '),
+        stepLabel,
+        time: displayTime,
+        timestamp: now.toISOString(),
         status: calc.status,
         method: 'MANUAL',
-        remarks: currentRecord.remarks ? `${currentRecord.remarks}, Manual Out` : 'Manual Punch Out',
-      };
+      },
+      ...prev.slice(0, 19),
+    ]);
 
-      const nextLogs = [...attendanceLogs];
-      nextLogs[existingIndex] = updatedRecord;
-      attendanceLogsRef.current = nextLogs;
-      setAttendanceLogs(nextLogs);
-      try { localStorage.setItem('reddmart_attendance_logs', JSON.stringify(nextLogs)); } catch (_) {}
-      logAttendanceToSupabase(updatedRecord);
-      try { broadcastDataChanged(); } catch (_) {}
-
-      setLiveScanFeed((prev) => [
-        {
-          id: `scan-${Date.now()}`,
-          employeeId: employee.id,
-          employeeName: employee.name,
-          branchId: employee.branchId,
-          action: 'TIME_OUT',
-          time: displayTime,
-          timestamp: now.toISOString(),
-          status: calc.status,
-          method: 'MANUAL',
-        },
-        ...prev.slice(0, 19),
-      ]);
-
-      return { success: true, message: `Time Out recorded at ${timeHHMM}. Total worked: ${calc.regularHours} hrs` };
-    }
+    return { success: true, message: `${stepLabel} recorded at ${timeHHMM}. Total regular: ${calc.regularHours}h` };
   };
 
   const addManualAttendance = (entryData) => {
@@ -1351,12 +1402,15 @@ export const DataProvider = ({ children }) => {
 
     const currentShift = settingsRef.current?.defaultShift || settings?.defaultShift || { startTime: '08:00', endTime: '17:00', gracePeriodMinutes: 15 };
 
-    const calc = calculateTimeEntry(
-      entryData.timeIn,
-      entryData.timeOut,
-      Number(entryData.breakMinutes) || 60,
-      currentShift
-    );
+    const in1 = entryData.in1 || entryData.timeIn || null;
+    const out1 = entryData.out1 || (entryData.in2 ? null : entryData.timeOut) || null;
+    const in2 = entryData.in2 || null;
+    const out2 = entryData.out2 || null;
+    const in3 = entryData.in3 || null;
+    const out3 = entryData.out3 || null;
+
+    const punches = { in1, out1, in2, out2, in3, out3 };
+    const calc = calculateTimeEntry(punches, currentShift);
 
     const newLog = {
       id: `ATT-${employee.id}-${entryData.date}-${Date.now()}`,
@@ -1364,8 +1418,14 @@ export const DataProvider = ({ children }) => {
       employeeName: employee.name,
       branchId: employee.branchId,
       date: entryData.date,
-      timeIn: entryData.timeIn || null,
-      timeOut: entryData.timeOut || null,
+      timeIn: in1,
+      timeOut: out3 || out2 || out1 || null,
+      in1,
+      out1,
+      in2,
+      out2,
+      in3,
+      out3,
       breakMinutes: Number(entryData.breakMinutes) || 60,
       regularHours: calc.regularHours,
       overtimeHours: calc.overtimeHours,
@@ -1375,6 +1435,7 @@ export const DataProvider = ({ children }) => {
       method: 'MANUAL',
       remarks: entryData.remarks || 'Manual Adjustment',
       isManual: true,
+      updatedAt: new Date().toISOString(),
     };
 
     const nextLogs = [newLog, ...attendanceLogs];

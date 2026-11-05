@@ -31,15 +31,15 @@ export const ScanQRPage = () => {
 
     if (result.success) {
       addToast({
-        title: result.action === 'TIME_IN' ? 'Time In Recorded' : 'Time Out Recorded',
+        title: result.stepLabel || (result.action?.includes('IN') ? 'Time In Recorded' : 'Time Out Recorded'),
         message: result.message,
         type: 'success',
       });
     } else {
       let toastTitle = 'Scan Verification Error';
-      if (result.reason === 'EARLY_TIMEOUT_BLOCKED') toastTitle = 'Early Time Out Blocked';
-      else if (result.reason === 'ALREADY_COMPLETED') toastTitle = 'Daily Scan Limit Reached';
+      if (result.reason === 'ALREADY_COMPLETED') toastTitle = 'Daily Scan Limit Reached (3 In, 3 Out)';
       else if (result.reason === 'WRONG_BRANCH') toastTitle = 'Access Denied: Wrong Branch';
+      else if (result.reason === 'DEBOUNCE') toastTitle = 'Scan Debounce';
 
       addToast({
         title: toastTitle,
@@ -184,12 +184,12 @@ export const ScanQRPage = () => {
                   <div className="text-right">
                     <span
                       className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                        scan.action === 'TIME_IN'
+                        (scan.action?.includes('IN') || scan.stepType === 'IN')
                           ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          : 'bg-rose-50 text-rose-700 border-rose-200'
+                          : 'bg-blue-50 text-blue-700 border-blue-200'
                       }`}
                     >
-                      {scan.action === 'TIME_IN' ? 'Time In' : 'Time Out'}
+                      {scan.shortLabel || scan.stepLabel || (scan.action?.includes('IN') ? 'Time In' : 'Time Out')}
                     </span>
                     <p className="font-mono text-[11px] text-slate-500 mt-0.5">{scan.time}</p>
                   </div>
