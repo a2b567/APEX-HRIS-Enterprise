@@ -49,6 +49,9 @@ export const LoginPage = () => {
 
   // Registration form state for employee
   const [regForm, setRegForm] = useState({
+    firstName: '',
+    middleName: '',
+    lastName: '',
     name: '',
     email: '',
     username: '',
@@ -60,6 +63,25 @@ export const LoginPage = () => {
     idDocumentUrl: null,
     idDocumentName: '',
   });
+
+  const handleRegNameChange = (field, val) => {
+    const updated = { ...regForm, [field]: val };
+    const fName = field === 'firstName' ? val : (regForm.firstName || '');
+    const mName = field === 'middleName' ? val : (regForm.middleName || '');
+    const lName = field === 'lastName' ? val : (regForm.lastName || '');
+    const fullName = [fName, mName, lName].filter(Boolean).join(' ').trim();
+    updated.name = fullName;
+
+    const autoUser = [fName, lName]
+      .filter(Boolean)
+      .join('.')
+      .toLowerCase()
+      .replace(/[^a-z0-9.]/g, '');
+    if (autoUser && (!regForm.username || regForm.username === regForm.name?.toLowerCase().replace(/[^a-z0-9.]/g, '.'))) {
+      updated.username = autoUser;
+    }
+    setRegForm(updated);
+  };
 
   const [idPreview, setIdPreview] = useState(null);
   const [idValidating, setIdValidating] = useState(false);
@@ -550,26 +572,48 @@ export const LoginPage = () => {
                 </div>
 
                 <form onSubmit={handleRegister} className="space-y-3.5 pt-1">
-                  <div>
-                    <label className="block text-[12px] font-semibold text-slate-300 mb-1">
-                      Full Name *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={regForm.name}
-                      onChange={(e) => {
-                        const newName = e.target.value;
-                        const autoUser = newName.toLowerCase().trim().replace(/[^a-z0-9]+/g, '.').replace(/^\.|\.$/g, '');
-                        setRegForm({
-                          ...regForm,
-                          name: newName,
-                          username: regForm.username ? regForm.username : autoUser,
-                        });
-                      }}
-                      placeholder="e.g. Maria Santos"
-                      className="block w-full px-3.5 py-2.5 bg-[#081226] border border-slate-700/80 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition shadow-inner"
-                    />
+                  {/* First, Middle, Last Name */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[12px] font-semibold text-slate-300 mb-1">
+                        First Name *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={regForm.firstName || ''}
+                        onChange={(e) => handleRegNameChange('firstName', e.target.value)}
+                        placeholder="e.g. Maria"
+                        className="block w-full px-3 py-2 bg-[#081226] border border-slate-700/80 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition shadow-inner"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[12px] font-semibold text-slate-300 mb-1">
+                        Middle Name
+                      </label>
+                      <input
+                        type="text"
+                        value={regForm.middleName || ''}
+                        onChange={(e) => handleRegNameChange('middleName', e.target.value)}
+                        placeholder="e.g. Santos (Optional)"
+                        className="block w-full px-3 py-2 bg-[#081226] border border-slate-700/80 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition shadow-inner"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[12px] font-semibold text-slate-300 mb-1">
+                        Last Name *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={regForm.lastName || ''}
+                        onChange={(e) => handleRegNameChange('lastName', e.target.value)}
+                        placeholder="e.g. Dela Cruz"
+                        className="block w-full px-3 py-2 bg-[#081226] border border-slate-700/80 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition shadow-inner"
+                      />
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

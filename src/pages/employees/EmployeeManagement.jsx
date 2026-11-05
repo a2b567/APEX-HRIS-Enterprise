@@ -337,6 +337,9 @@ export const EmployeeManagement = () => {
 
   const [formData, setFormData] = useState({
     id: '',
+    firstName: '',
+    middleName: '',
+    lastName: '',
     name: '',
     email: '',
     phone: '',
@@ -394,6 +397,9 @@ export const EmployeeManagement = () => {
     setEditingEmployee(null);
     setFormData({
       id: '',
+      firstName: '',
+      middleName: '',
+      lastName: '',
       name: '',
       email: '',
       phone: '',
@@ -419,8 +425,29 @@ export const EmployeeManagement = () => {
   const handleOpenEdit = (emp) => {
     setEditingEmployee(emp);
     const existingUser = users.find((u) => u.employeeId === emp.id || u.id === emp.userId);
+
+    let fName = emp.firstName || '';
+    let mName = emp.middleName || '';
+    let lName = emp.lastName || '';
+    if (!fName && !lName && emp.name) {
+      const parts = emp.name.trim().split(/\s+/);
+      if (parts.length === 1) {
+        fName = parts[0];
+      } else if (parts.length === 2) {
+        fName = parts[0];
+        lName = parts[1];
+      } else if (parts.length >= 3) {
+        fName = parts[0];
+        lName = parts[parts.length - 1];
+        mName = parts.slice(1, -1).join(' ');
+      }
+    }
+
     setFormData({
       ...emp,
+      firstName: fName,
+      middleName: mName,
+      lastName: lName,
       dailyRate: emp.dailyRate || 750,
       hourlyRate: emp.hourlyRate || (emp.dailyRate ? emp.dailyRate / 8 : 93.75),
       createAccount: !existingUser,
@@ -428,6 +455,27 @@ export const EmployeeManagement = () => {
       accountPassword: 'Emp@123',
     });
     setModalOpen(true);
+  };
+
+  const handleNameChange = (field, val) => {
+    const updated = { ...formData, [field]: val };
+    const fName = field === 'firstName' ? val : (formData.firstName || '');
+    const mName = field === 'middleName' ? val : (formData.middleName || '');
+    const lName = field === 'lastName' ? val : (formData.lastName || '');
+    const fullName = [fName, mName, lName].filter(Boolean).join(' ').trim();
+    updated.name = fullName;
+
+    if (!editingEmployee) {
+      const autoUser = [fName, lName]
+        .filter(Boolean)
+        .join('.')
+        .toLowerCase()
+        .replace(/[^a-z0-9.]/g, '');
+      if (autoUser && (!formData.username || formData.username === formData.name?.toLowerCase().replace(/[^a-z0-9.]/g, '.'))) {
+        updated.username = autoUser;
+      }
+    }
+    setFormData(updated);
   };
 
   const handleDailyRateChange = (rateVal) => {
@@ -865,54 +913,75 @@ export const EmployeeManagement = () => {
           maxWidth="max-w-2xl"
         >
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* First, Middle, Last Name */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Full Name *
+                  First Name *
                 </label>
                 <input
                   type="text"
                   required
-                  value={formData.name}
-                  onChange={(e) => {
-                    const newName = e.target.value;
-                    const autoUsername = newName.toLowerCase().trim().replace(/[^a-z0-9]+/g, '.').replace(/^\.|\.$/g, '');
-                    setFormData({
-                      ...formData,
-                      name: newName,
-                      username: formData.username && formData.username !== '' ? formData.username : autoUsername,
-                    });
-                  }}
-                  placeholder="e.g. Gabriel Mendoza"
+                  value={formData.firstName || ''}
+                  onChange={(e) => handleNameChange('firstName', e.target.value)}
+                  placeholder="e.g. Lawrence"
                   className="mt-1 w-full bg-slate-50 border border-slate-300 text-sm text-slate-900 rounded-xl p-2.5 focus:bg-white focus:ring-2 focus:ring-blue-600"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Branch Assignment
+                  Middle Name
                 </label>
-                {isSuperAdmin ? (
-                  <select
-                    value={formData.branchId}
-                    onChange={(e) => setFormData({ ...formData, branchId: e.target.value })}
-                    className="mt-1 w-full bg-slate-50 border border-slate-300 text-sm text-slate-900 rounded-xl p-2.5 focus:bg-white focus:ring-2 focus:ring-blue-600"
-                  >
-                    {branches.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name} ({b.id})
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    type="text"
-                    disabled
-                    value={`${supervisorBranchId} (Locked to your branch)`}
-                    className="mt-1 w-full bg-slate-100 border border-slate-200 text-xs text-slate-500 rounded-xl p-2.5"
-                  />
-                )}
+                <input
+                  type="text"
+                  value={formData.middleName || ''}
+                  onChange={(e) => handleNameChange('middleName', e.target.value)}
+                  placeholder="e.g. Belen (Optional)"
+                  className="mt-1 w-full bg-slate-50 border border-slate-300 text-sm text-slate-900 rounded-xl p-2.5 focus:bg-white focus:ring-2 focus:ring-blue-600"
+                />
               </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Last Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.lastName || ''}
+                  onChange={(e) => handleNameChange('lastName', e.target.value)}
+                  placeholder="e.g. Aranas"
+                  className="mt-1 w-full bg-slate-50 border border-slate-300 text-sm text-slate-900 rounded-xl p-2.5 focus:bg-white focus:ring-2 focus:ring-blue-600"
+                />
+              </div>
+            </div>
+
+            {/* Branch Assignment */}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                Branch Assignment
+              </label>
+              {isSuperAdmin ? (
+                <select
+                  value={formData.branchId}
+                  onChange={(e) => setFormData({ ...formData, branchId: e.target.value })}
+                  className="mt-1 w-full bg-slate-50 border border-slate-300 text-sm text-slate-900 rounded-xl p-2.5 focus:bg-white focus:ring-2 focus:ring-blue-600"
+                >
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name} ({b.id})
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  disabled
+                  value={`${supervisorBranchId} (Locked to your branch)`}
+                  className="mt-1 w-full bg-slate-100 border border-slate-200 text-xs text-slate-500 rounded-xl p-2.5"
+                />
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

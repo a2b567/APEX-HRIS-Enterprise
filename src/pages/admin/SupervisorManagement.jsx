@@ -24,6 +24,9 @@ export const SupervisorManagement = () => {
   const [editingSupervisor, setEditingSupervisor] = useState(null);
   const [deleteConfirmSupervisor, setDeleteConfirmSupervisor] = useState(null);
   const [formData, setFormData] = useState({
+    firstName: '',
+    middleName: '',
+    lastName: '',
     name: '',
     username: '',
     email: '',
@@ -39,6 +42,9 @@ export const SupervisorManagement = () => {
   const handleOpenCreate = () => {
     setEditingSupervisor(null);
     setFormData({
+      firstName: '',
+      middleName: '',
+      lastName: '',
       name: '',
       username: '',
       email: '',
@@ -53,7 +59,20 @@ export const SupervisorManagement = () => {
 
   const handleOpenEdit = (sup) => {
     setEditingSupervisor(sup);
+    let fName = sup.firstName || '';
+    let mName = sup.middleName || '';
+    let lName = sup.lastName || '';
+    if (!fName && !lName && sup.name) {
+      const parts = sup.name.trim().split(/\s+/);
+      if (parts.length === 1) fName = parts[0];
+      else if (parts.length === 2) { fName = parts[0]; lName = parts[1]; }
+      else if (parts.length >= 3) { fName = parts[0]; lName = parts[parts.length - 1]; mName = parts.slice(1, -1).join(' '); }
+    }
+
     setFormData({
+      firstName: fName,
+      middleName: mName,
+      lastName: lName,
       name: sup.name,
       username: sup.username,
       email: sup.email,
@@ -64,6 +83,21 @@ export const SupervisorManagement = () => {
     });
     setErrorMsg('');
     setModalOpen(true);
+  };
+
+  const handleNameChange = (field, val) => {
+    const updated = { ...formData, [field]: val };
+    const fName = field === 'firstName' ? val : (formData.firstName || '');
+    const mName = field === 'middleName' ? val : (formData.middleName || '');
+    const lName = field === 'lastName' ? val : (formData.lastName || '');
+    const fullName = [fName, mName, lName].filter(Boolean).join(' ').trim();
+    updated.name = fullName;
+
+    if (!editingSupervisor && (!formData.username || formData.username === formData.name?.toLowerCase().replace(/[^a-z0-9.]/g, ''))) {
+      const autoUser = [fName, lName].filter(Boolean).join('.').toLowerCase().replace(/[^a-z0-9.]/g, '');
+      if (autoUser) updated.username = autoUser;
+    }
+    setFormData(updated);
   };
 
   const handleSubmit = (e) => {
@@ -303,18 +337,48 @@ export const SupervisorManagement = () => {
               </div>
             )}
 
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                Full Name *
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="e.g. Marco Antonio Rivera"
-                className="mt-1 w-full bg-slate-50 border border-slate-300 text-sm text-slate-900 rounded-xl p-2.5 focus:bg-white focus:ring-2 focus:ring-blue-600"
-              />
+            {/* First, Middle, Last Name */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                  First Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.firstName || ''}
+                  onChange={(e) => handleNameChange('firstName', e.target.value)}
+                  placeholder="e.g. Marco"
+                  className="mt-1 w-full bg-slate-50 border border-slate-300 text-sm text-slate-900 rounded-xl p-2.5 focus:bg-white focus:ring-2 focus:ring-blue-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Middle Name
+                </label>
+                <input
+                  type="text"
+                  value={formData.middleName || ''}
+                  onChange={(e) => handleNameChange('middleName', e.target.value)}
+                  placeholder="e.g. Antonio (Optional)"
+                  className="mt-1 w-full bg-slate-50 border border-slate-300 text-sm text-slate-900 rounded-xl p-2.5 focus:bg-white focus:ring-2 focus:ring-blue-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Last Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.lastName || ''}
+                  onChange={(e) => handleNameChange('lastName', e.target.value)}
+                  placeholder="e.g. Rivera"
+                  className="mt-1 w-full bg-slate-50 border border-slate-300 text-sm text-slate-900 rounded-xl p-2.5 focus:bg-white focus:ring-2 focus:ring-blue-600"
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
