@@ -52,11 +52,13 @@ export const DTRModule = () => {
     employeeId: '',
     date: new Date().toISOString().split('T')[0],
     in1: '08:00',
-    out1: '12:00',
-    in2: '13:00',
-    out2: '17:00',
-    in3: '',
-    out3: '',
+    out1: '10:00',
+    in2: '10:15',
+    out2: '12:00',
+    in3: '13:00',
+    out3: '17:00',
+    in4: '',
+    out4: '',
     breakMinutes: 60,
     remarks: 'Manual Shift Entry',
     status: 'Present',
@@ -163,7 +165,7 @@ export const DTRModule = () => {
   const handleExportCSV = () => {
     const headers = [
       'ID', 'Date', 'Employee ID', 'Employee Name', 'Branch',
-      'In 1 (AM)', 'Out 1 (Lunch)', 'In 2 (PM)', 'Out 2 (Dismissal)', 'In 3 (OT In)', 'Out 3 (OT Out)',
+      'In 1 (AM In)', 'Out 1 (Break Out)', 'In 2 (Break In)', 'Out 2 (Lunch Out)', 'In 3 (Lunch In)', 'Out 3 (Dismissal)', 'In 4 (OT In)', 'Out 4 (OT Out)',
       'Reg Hours', 'OT Hours', 'Late (min)', 'Undertime (min)', 'Method', 'Status', 'Remarks'
     ];
     const rows = filteredLogs.map((l) => [
@@ -178,6 +180,8 @@ export const DTRModule = () => {
       l.out2 || '—',
       l.in3 || '—',
       l.out3 || '—',
+      l.in4 || '—',
+      l.out4 || '—',
       l.regularHours || 0,
       l.overtimeHours || 0,
       l.lateMinutes || 0,
@@ -389,33 +393,38 @@ export const DTRModule = () => {
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-200">
               <tr>
-                <th rowSpan="2" className="py-3 px-3 align-middle">Date</th>
-                <th rowSpan="2" className="py-3 px-3 align-middle">Employee</th>
-                {isSuperAdmin && <th rowSpan="2" className="py-3 px-3 align-middle">Branch</th>}
-                <th colSpan="2" className="py-1.5 px-2 text-center bg-blue-50/70 text-blue-900 border-x border-slate-200 font-bold">
-                  Session 1 (AM)
+                <th rowSpan="2" className="py-3 px-2 align-middle">Date</th>
+                <th rowSpan="2" className="py-3 px-2 align-middle">Employee</th>
+                {isSuperAdmin && <th rowSpan="2" className="py-3 px-2 align-middle">Branch</th>}
+                <th colSpan="2" className="py-1 px-1.5 text-center bg-blue-50/70 text-blue-900 border-x border-slate-200 font-bold">
+                  S1 (Morning)
                 </th>
-                <th colSpan="2" className="py-1.5 px-2 text-center bg-indigo-50/70 text-indigo-900 border-r border-slate-200 font-bold">
-                  Session 2 (PM)
+                <th colSpan="2" className="py-1 px-1.5 text-center bg-teal-50/70 text-teal-900 border-r border-slate-200 font-bold">
+                  S2 (Mid-Day)
                 </th>
-                <th colSpan="2" className="py-1.5 px-2 text-center bg-amber-50/70 text-amber-900 border-r border-slate-200 font-bold">
-                  Session 3 (OT)
+                <th colSpan="2" className="py-1 px-1.5 text-center bg-indigo-50/70 text-indigo-900 border-r border-slate-200 font-bold">
+                  S3 (Afternoon)
+                </th>
+                <th colSpan="2" className="py-1 px-1.5 text-center bg-amber-50/70 text-amber-900 border-r border-slate-200 font-bold">
+                  S4 (Overtime)
                 </th>
                 <th rowSpan="2" className="py-3 px-2 text-center align-middle">Reg Hrs</th>
                 <th rowSpan="2" className="py-3 px-2 text-center align-middle">OT</th>
                 <th rowSpan="2" className="py-3 px-2 text-center align-middle">Late</th>
                 <th rowSpan="2" className="py-3 px-2 text-center align-middle">Method</th>
                 <th rowSpan="2" className="py-3 px-2 text-center align-middle">Status</th>
-                <th rowSpan="2" className="py-3 px-3 align-middle">Remarks</th>
-                {!isEmployee && <th rowSpan="2" className="py-3 px-3 text-right align-middle no-print">Action</th>}
+                <th rowSpan="2" className="py-3 px-2 align-middle">Remarks</th>
+                {!isEmployee && <th rowSpan="2" className="py-3 px-2 text-right align-middle no-print">Action</th>}
               </tr>
               <tr>
-                <th className="py-1.5 px-2 text-center bg-emerald-50/50 text-emerald-700 font-bold border-l border-slate-200">In 1</th>
-                <th className="py-1.5 px-2 text-center bg-rose-50/50 text-rose-700 font-bold border-r border-slate-200">Out 1</th>
-                <th className="py-1.5 px-2 text-center bg-emerald-50/50 text-emerald-700 font-bold">In 2</th>
-                <th className="py-1.5 px-2 text-center bg-rose-50/50 text-rose-700 font-bold border-r border-slate-200">Out 2</th>
-                <th className="py-1.5 px-2 text-center bg-emerald-50/50 text-emerald-700 font-bold">In 3</th>
-                <th className="py-1.5 px-2 text-center bg-rose-50/50 text-rose-700 font-bold border-r border-slate-200">Out 3</th>
+                <th className="py-1 px-1 text-center bg-emerald-50/50 text-emerald-700 font-bold border-l border-slate-200">In 1</th>
+                <th className="py-1 px-1 text-center bg-rose-50/50 text-rose-700 font-bold border-r border-slate-200">Out 1</th>
+                <th className="py-1 px-1 text-center bg-emerald-50/50 text-emerald-700 font-bold">In 2</th>
+                <th className="py-1 px-1 text-center bg-rose-50/50 text-rose-700 font-bold border-r border-slate-200">Out 2</th>
+                <th className="py-1 px-1 text-center bg-emerald-50/50 text-emerald-700 font-bold">In 3</th>
+                <th className="py-1 px-1 text-center bg-rose-50/50 text-rose-700 font-bold border-r border-slate-200">Out 3</th>
+                <th className="py-1 px-1 text-center bg-emerald-50/50 text-emerald-700 font-bold">In 4</th>
+                <th className="py-1 px-1 text-center bg-rose-50/50 text-rose-700 font-bold border-r border-slate-200">Out 4</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -427,46 +436,56 @@ export const DTRModule = () => {
                 const out2Val = log.out2;
                 const in3Val = log.in3;
                 const out3Val = log.out3;
+                const in4Val = log.in4;
+                const out4Val = log.out4;
 
                 return (
                   <tr key={log.id} className="hover:bg-slate-50/80 transition">
-                    <td className="py-3 px-3 font-semibold text-slate-900 whitespace-nowrap">
+                    <td className="py-3 px-2 font-semibold text-slate-900 whitespace-nowrap">
                       {formatDate(log.date)}
                     </td>
 
-                    <td className="py-3 px-3">
+                    <td className="py-3 px-2">
                       <div className="font-semibold text-slate-900">{log.employeeName}</div>
                       <div className="font-mono text-[10px] text-blue-600">{log.employeeId}</div>
                     </td>
 
                     {isSuperAdmin && (
-                      <td className="py-3 px-3">
+                      <td className="py-3 px-2">
                         <span className="font-mono text-[11px] text-slate-600">{branchObj?.code || log.branchId}</span>
                       </td>
                     )}
 
-                    {/* Session 1 (Morning) */}
-                    <td className="py-2.5 px-2 text-center font-mono font-medium text-emerald-600 bg-emerald-50/20 border-l border-slate-100 whitespace-nowrap">
+                    {/* Session 1 (Morning: In 1 / Out 1) */}
+                    <td className="py-2.5 px-1.5 text-center font-mono font-medium text-emerald-600 bg-emerald-50/20 border-l border-slate-100 whitespace-nowrap">
                       {in1Val ? formatTime(in1Val) : '—'}
                     </td>
-                    <td className="py-2.5 px-2 text-center font-mono font-medium text-rose-600 bg-rose-50/20 border-r border-slate-100 whitespace-nowrap">
+                    <td className="py-2.5 px-1.5 text-center font-mono font-medium text-rose-600 bg-rose-50/20 border-r border-slate-100 whitespace-nowrap">
                       {out1Val ? formatTime(out1Val) : '—'}
                     </td>
 
-                    {/* Session 2 (Afternoon) */}
-                    <td className="py-2.5 px-2 text-center font-mono font-medium text-emerald-600 bg-emerald-50/20 whitespace-nowrap">
+                    {/* Session 2 (Mid-Day: In 2 / Out 2) */}
+                    <td className="py-2.5 px-1.5 text-center font-mono font-medium text-emerald-600 bg-emerald-50/20 whitespace-nowrap">
                       {in2Val ? formatTime(in2Val) : '—'}
                     </td>
-                    <td className="py-2.5 px-2 text-center font-mono font-medium text-rose-600 bg-rose-50/20 border-r border-slate-100 whitespace-nowrap">
+                    <td className="py-2.5 px-1.5 text-center font-mono font-medium text-rose-600 bg-rose-50/20 border-r border-slate-100 whitespace-nowrap">
                       {out2Val ? formatTime(out2Val) : '—'}
                     </td>
 
-                    {/* Session 3 (Overtime) */}
-                    <td className="py-2.5 px-2 text-center font-mono font-medium text-emerald-600 bg-emerald-50/20 whitespace-nowrap">
+                    {/* Session 3 (Afternoon: In 3 / Out 3) */}
+                    <td className="py-2.5 px-1.5 text-center font-mono font-medium text-emerald-600 bg-emerald-50/20 whitespace-nowrap">
                       {in3Val ? formatTime(in3Val) : '—'}
                     </td>
-                    <td className="py-2.5 px-2 text-center font-mono font-medium text-rose-600 bg-rose-50/20 border-r border-slate-100 whitespace-nowrap">
+                    <td className="py-2.5 px-1.5 text-center font-mono font-medium text-rose-600 bg-rose-50/20 border-r border-slate-100 whitespace-nowrap">
                       {out3Val ? formatTime(out3Val) : '—'}
+                    </td>
+
+                    {/* Session 4 (Overtime: In 4 / Out 4) */}
+                    <td className="py-2.5 px-1.5 text-center font-mono font-medium text-emerald-600 bg-emerald-50/20 whitespace-nowrap">
+                      {in4Val ? formatTime(in4Val) : '—'}
+                    </td>
+                    <td className="py-2.5 px-1.5 text-center font-mono font-medium text-rose-600 bg-rose-50/20 border-r border-slate-100 whitespace-nowrap">
+                      {out4Val ? formatTime(out4Val) : '—'}
                     </td>
 
                     <td className="py-3 px-2 text-center font-mono text-slate-700">
@@ -583,7 +602,7 @@ export const DTRModule = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Out 1 (Lunch Out)</label>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Out 1 (Morning Break Out)</label>
                   <input
                     type="time"
                     value={manualForm.out1 || ''}
@@ -595,11 +614,11 @@ export const DTRModule = () => {
             </div>
 
             {/* Session 2 */}
-            <div className="p-3 bg-indigo-50/50 rounded-xl border border-indigo-100 space-y-2">
-              <span className="text-[11px] font-bold text-indigo-900 uppercase tracking-wider">Session 2 (Afternoon Shift)</span>
+            <div className="p-3 bg-teal-50/50 rounded-xl border border-teal-100 space-y-2">
+              <span className="text-[11px] font-bold text-teal-900 uppercase tracking-wider">Session 2 (Mid-Day / Pre-Lunch)</span>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">In 2 (Lunch Return)</label>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">In 2 (Morning Break In)</label>
                   <input
                     type="time"
                     value={manualForm.in2 || ''}
@@ -608,7 +627,7 @@ export const DTRModule = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Out 2 (Dismissal)</label>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Out 2 (Lunch Break Out)</label>
                   <input
                     type="time"
                     value={manualForm.out2 || ''}
@@ -620,11 +639,11 @@ export const DTRModule = () => {
             </div>
 
             {/* Session 3 */}
-            <div className="p-3 bg-amber-50/50 rounded-xl border border-amber-100 space-y-2">
-              <span className="text-[11px] font-bold text-amber-900 uppercase tracking-wider">Session 3 (Overtime — Optional)</span>
+            <div className="p-3 bg-indigo-50/50 rounded-xl border border-indigo-100 space-y-2">
+              <span className="text-[11px] font-bold text-indigo-900 uppercase tracking-wider">Session 3 (Afternoon Shift)</span>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">In 3 (OT Start)</label>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">In 3 (Lunch Break In)</label>
                   <input
                     type="time"
                     value={manualForm.in3 || ''}
@@ -633,11 +652,36 @@ export const DTRModule = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Out 3 (OT End)</label>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Out 3 (Regular Shift Dismissal)</label>
                   <input
                     type="time"
                     value={manualForm.out3 || ''}
                     onChange={(e) => setManualForm({ ...manualForm, out3: e.target.value })}
+                    className="w-full bg-white border border-slate-200 text-xs text-slate-800 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Session 4 */}
+            <div className="p-3 bg-amber-50/50 rounded-xl border border-amber-100 space-y-2">
+              <span className="text-[11px] font-bold text-amber-900 uppercase tracking-wider">Session 4 (Overtime — Optional)</span>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">In 4 (Overtime In)</label>
+                  <input
+                    type="time"
+                    value={manualForm.in4 || ''}
+                    onChange={(e) => setManualForm({ ...manualForm, in4: e.target.value })}
+                    className="w-full bg-white border border-slate-200 text-xs text-slate-800 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Out 4 (Overtime Out)</label>
+                  <input
+                    type="time"
+                    value={manualForm.out4 || ''}
+                    onChange={(e) => setManualForm({ ...manualForm, out4: e.target.value })}
                     className="w-full bg-white border border-slate-200 text-xs text-slate-800 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 font-mono"
                   />
                 </div>
@@ -652,11 +696,13 @@ export const DTRModule = () => {
                 onClick={() => setManualForm({
                   ...manualForm,
                   in1: '08:00',
-                  out1: '12:00',
-                  in2: '13:00',
-                  out2: '17:00',
-                  in3: '',
-                  out3: '',
+                  out1: '10:00',
+                  in2: '10:15',
+                  out2: '12:00',
+                  in3: '13:00',
+                  out3: '17:00',
+                  in4: '',
+                  out4: '',
                 })}
                 className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-[10px] text-slate-700 font-semibold"
               >
@@ -667,15 +713,17 @@ export const DTRModule = () => {
                 onClick={() => setManualForm({
                   ...manualForm,
                   in1: '08:00',
-                  out1: '12:00',
-                  in2: '13:00',
-                  out2: '17:00',
-                  in3: '17:30',
-                  out3: '19:30',
+                  out1: '10:00',
+                  in2: '10:15',
+                  out2: '12:00',
+                  in3: '13:00',
+                  out3: '17:00',
+                  in4: '17:30',
+                  out4: '19:30',
                 })}
                 className="px-2 py-1 rounded bg-amber-100 hover:bg-amber-200 text-[10px] text-amber-800 font-semibold"
               >
-                With 2h Overtime
+                With Overtime
               </button>
             </div>
 

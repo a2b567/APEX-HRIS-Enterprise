@@ -27,7 +27,7 @@ export const ScanResultCard = ({ result, onClose }) => {
       cardStyle = 'border-rose-300 bg-rose-50 text-rose-950 shadow-rose-100';
       Icon = XCircle;
       iconColor = 'text-rose-600 bg-rose-100 ring-2 ring-rose-200';
-      title = 'Daily Scan Limit Reached (3 In, 3 Out Completed)';
+      title = 'Tapos na ang lahat ng In/Out pairs (8 scans completed)';
     } else if (result.reason === 'DEBOUNCE') {
       cardStyle = 'border-amber-300 bg-amber-50 text-amber-950 shadow-amber-100';
       Icon = Clock;
@@ -83,24 +83,30 @@ export const ScanResultCard = ({ result, onClose }) => {
                 {result.employee.position} · {result.employee.department}
               </p>
 
-              {/* 3 Sessions In/Out Tracker */}
-              <div className="pt-2 border-t border-slate-100 grid grid-cols-3 gap-1.5 text-center text-[10px]">
+              {/* 4 Sessions In/Out Tracker */}
+              <div className="pt-2 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-center text-[10px]">
                 <div className="bg-slate-50 border border-slate-200/80 rounded-lg p-1.5">
-                  <div className="font-bold text-slate-600">Session 1 (AM)</div>
+                  <div className="font-bold text-slate-600">S1: Morning</div>
                   <div className="text-[10px] text-slate-500 font-mono mt-0.5">
                     {p.in1 ? formatTime(p.in1) : '—'} / {p.out1 ? formatTime(p.out1) : '—'}
                   </div>
                 </div>
                 <div className="bg-slate-50 border border-slate-200/80 rounded-lg p-1.5">
-                  <div className="font-bold text-slate-600">Session 2 (PM)</div>
+                  <div className="font-bold text-slate-600">S2: Mid-Day</div>
                   <div className="text-[10px] text-slate-500 font-mono mt-0.5">
                     {p.in2 ? formatTime(p.in2) : '—'} / {p.out2 ? formatTime(p.out2) : '—'}
                   </div>
                 </div>
                 <div className="bg-slate-50 border border-slate-200/80 rounded-lg p-1.5">
-                  <div className="font-bold text-slate-600">Session 3 (OT)</div>
+                  <div className="font-bold text-slate-600">S3: Afternoon</div>
                   <div className="text-[10px] text-slate-500 font-mono mt-0.5">
                     {p.in3 ? formatTime(p.in3) : '—'} / {p.out3 ? formatTime(p.out3) : '—'}
+                  </div>
+                </div>
+                <div className="bg-slate-50 border border-slate-200/80 rounded-lg p-1.5">
+                  <div className="font-bold text-slate-600">S4: Overtime</div>
+                  <div className="text-[10px] text-slate-500 font-mono mt-0.5">
+                    {p.in4 ? formatTime(p.in4) : '—'} / {p.out4 ? formatTime(p.out4) : '—'}
                   </div>
                 </div>
               </div>

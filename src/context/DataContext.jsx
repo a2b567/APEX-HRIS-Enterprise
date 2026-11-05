@@ -1003,14 +1003,17 @@ export const DataProvider = ({ children }) => {
   };
 
   /**
-   * QR SCAN ATTENDANCE ENGINE (3 TIMES IN & OUT SUPPORT)
-   * 6 punches per day:
-   * 1. In 1 (Morning Check-In)
-   * 2. Out 1 (Lunch Break Out)
-   * 3. In 2 (Afternoon Check-In / Lunch Return)
-   * 4. Out 2 (Shift Dismissal Out)
-   * 5. In 3 (Overtime In)
-   * 6. Out 3 (Overtime Out)
+   * QR SCAN ATTENDANCE ENGINE (4 SESSIONS / 8 PUNCHES SUPPORT)
+   * 8 punches per day:
+   * Scan 1: In 1 - Morning Check-In (AM Arrival)
+   * Scan 2: Out 1 - Morning Break Out (10:00 AM)
+   * Scan 3: In 2 - Morning Break In (10:15 AM)
+   * Scan 4: Out 2 - Lunch Break Out (12:00 NN)
+   * Scan 5: In 3 - Lunch Break In (01:00 PM)
+   * Scan 6: Out 3 - Regular Shift Dismissal (05:00 PM)
+   * Scan 7: In 4 - Overtime In
+   * Scan 8: Out 4 - Overtime Out
+   * Scan 9+: Completed (Babala na tapos na ang lahat ng in/out pairs)
    */
   const recordQRScan = (qrString, scannerBranchId) => {
     const parsed = parseQRPayload(qrString);
@@ -1089,13 +1092,15 @@ export const DataProvider = ({ children }) => {
       }
     }
 
-    // Existing punches resolution (with legacy single timeIn/timeOut compatibility)
+    // Existing punches resolution (with backward compatibility)
     let in1 = existingLog?.in1 || existingLog?.timeIn || null;
     let out1 = existingLog?.out1 || (existingLog?.in2 ? null : existingLog?.timeOut) || null;
     let in2 = existingLog?.in2 || null;
     let out2 = existingLog?.out2 || null;
     let in3 = existingLog?.in3 || null;
     let out3 = existingLog?.out3 || null;
+    let in4 = existingLog?.in4 || null;
+    let out4 = existingLog?.out4 || null;
 
     let stepAction = '';
     let stepLabel = '';
@@ -1105,80 +1110,100 @@ export const DataProvider = ({ children }) => {
     let stepMessage = '';
 
     if (!in1) {
-      // 1. IN 1 (Morning Check-In)
+      // Scan 1: In 1 (Morning Check-In / AM Arrival)
       in1 = timeHHMM;
       stepAction = 'TIME_IN_1';
-      stepLabel = 'Time In 1 (Morning Arrival)';
+      stepLabel = 'Time In 1 (Morning Check-In / AM Arrival)';
       stepShortLabel = 'In 1';
       stepType = 'IN';
       sessionNum = 1;
     } else if (!out1) {
-      // 2. OUT 1 (Lunch Break Out)
+      // Scan 2: Out 1 (Morning Break Out)
       out1 = timeHHMM;
       stepAction = 'TIME_OUT_1';
-      stepLabel = 'Time Out 1 (Lunch Break Out)';
+      stepLabel = 'Time Out 1 (Morning Break Out)';
       stepShortLabel = 'Out 1';
       stepType = 'OUT';
       sessionNum = 1;
     } else if (!in2) {
-      // 3. IN 2 (Afternoon / Lunch Return)
+      // Scan 3: In 2 (Morning Break In)
       in2 = timeHHMM;
       stepAction = 'TIME_IN_2';
-      stepLabel = 'Time In 2 (Lunch Return / Afternoon)';
+      stepLabel = 'Time In 2 (Morning Break In)';
       stepShortLabel = 'In 2';
       stepType = 'IN';
       sessionNum = 2;
     } else if (!out2) {
-      // 4. OUT 2 (Regular Shift Dismissal)
+      // Scan 4: Out 2 (Lunch Break Out)
       out2 = timeHHMM;
       stepAction = 'TIME_OUT_2';
-      stepLabel = 'Time Out 2 (Shift Dismissal)';
+      stepLabel = 'Time Out 2 (Lunch Break Out)';
       stepShortLabel = 'Out 2';
       stepType = 'OUT';
       sessionNum = 2;
     } else if (!in3) {
-      // 5. IN 3 (Overtime Check-In)
+      // Scan 5: In 3 (Lunch Break In)
       in3 = timeHHMM;
       stepAction = 'TIME_IN_3';
-      stepLabel = 'Time In 3 (Overtime In)';
+      stepLabel = 'Time In 3 (Lunch Break In)';
       stepShortLabel = 'In 3';
       stepType = 'IN';
       sessionNum = 3;
     } else if (!out3) {
-      // 6. OUT 3 (Overtime Check-Out)
+      // Scan 6: Out 3 (Regular Shift Dismissal)
       out3 = timeHHMM;
       stepAction = 'TIME_OUT_3';
-      stepLabel = 'Time Out 3 (Overtime Out)';
+      stepLabel = 'Time Out 3 (Regular Shift Dismissal)';
       stepShortLabel = 'Out 3';
       stepType = 'OUT';
       sessionNum = 3;
+    } else if (!in4) {
+      // Scan 7: In 4 (Overtime In)
+      in4 = timeHHMM;
+      stepAction = 'TIME_IN_4';
+      stepLabel = 'Time In 4 (Overtime In)';
+      stepShortLabel = 'In 4';
+      stepType = 'IN';
+      sessionNum = 4;
+    } else if (!out4) {
+      // Scan 8: Out 4 (Overtime Out)
+      out4 = timeHHMM;
+      stepAction = 'TIME_OUT_4';
+      stepLabel = 'Time Out 4 (Overtime Out)';
+      stepShortLabel = 'Out 4';
+      stepType = 'OUT';
+      sessionNum = 4;
     } else {
-      // 7. ALL 3 SESSIONS (6 PUNCHES) ARE ALREADY COMPLETED
+      // Scan 9+: All 4 Sessions (8 punches) Completed
       try { soundFeedback.playError(); } catch (e) {}
       return {
         success: false,
         reason: 'ALREADY_COMPLETED',
         employee,
-        message: `Daily scan limit reached: ${employee.name} has completed all 3 In & Out sessions for today (6 logs recorded).`,
+        message: `Babala: Tapos na ang lahat ng in/out pairs para kay ${employee.name} ngayon (8 scans completed: 4 In, 4 Out).`,
       };
     }
 
-    const updatedPunches = { in1, out1, in2, out2, in3, out3 };
+    const updatedPunches = { in1, out1, in2, out2, in3, out3, in4, out4 };
     const calc = calculateTimeEntry(updatedPunches, currentShift);
 
     // Formulate descriptive success feedback
     if (stepAction === 'TIME_IN_1') {
-      stepMessage = `Time In 1 (Morning) recorded for ${employee.name} at ${displayTime} (${calc.lateMinutes > 0 ? `${calc.lateMinutes} mins late` : 'On Time'}). [1 of 3 In/Out pairs]`;
+      stepMessage = `Time In 1 (Morning Check-In) recorded for ${employee.name} at ${displayTime} (${calc.lateMinutes > 0 ? `${calc.lateMinutes} mins late` : 'On Time'}). [Scan 1/8]`;
     } else if (stepAction === 'TIME_OUT_1') {
-      stepMessage = `Time Out 1 (Lunch Out) recorded for ${employee.name} at ${displayTime}. Have a great lunch! [1 of 3 pairs completed]`;
+      stepMessage = `Time Out 1 (Morning Break Out) recorded for ${employee.name} at ${displayTime}. Take a quick rest! [Scan 2/8]`;
     } else if (stepAction === 'TIME_IN_2') {
-      stepMessage = `Time In 2 (Afternoon Return) recorded for ${employee.name} at ${displayTime}. Welcome back! [2 of 3 In/Out pairs]`;
+      stepMessage = `Time In 2 (Morning Break In) recorded for ${employee.name} at ${displayTime}. Welcome back! [Scan 3/8]`;
     } else if (stepAction === 'TIME_OUT_2') {
-      stepMessage = `Time Out 2 (Shift Dismissal) recorded for ${employee.name} at ${displayTime}. Rendered: ${calc.regularHours}h. [2 of 3 pairs completed]`;
+      stepMessage = `Time Out 2 (Lunch Break Out) recorded for ${employee.name} at ${displayTime}. Have a great lunch! [Scan 4/8]`;
     } else if (stepAction === 'TIME_IN_3') {
-      stepMessage = `Time In 3 (Overtime In) recorded for ${employee.name} at ${displayTime}. [3 of 3 In/Out pairs]`;
+      stepMessage = `Time In 3 (Lunch Break In) recorded for ${employee.name} at ${displayTime}. Ready for afternoon shift! [Scan 5/8]`;
     } else if (stepAction === 'TIME_OUT_3') {
-      stepMessage = `Time Out 3 (Overtime Out) recorded for ${employee.name} at ${displayTime}. Day complete! Total: ${calc.regularHours}h reg + ${calc.overtimeHours}h OT.`;
+      stepMessage = `Time Out 3 (Regular Shift Dismissal) recorded for ${employee.name} at ${displayTime}. Rendered: ${calc.regularHours}h regular. [Scan 6/8]`;
+    } else if (stepAction === 'TIME_IN_4') {
+      stepMessage = `Time In 4 (Overtime In) recorded for ${employee.name} at ${displayTime}. OT session started. [Scan 7/8]`;
+    } else if (stepAction === 'TIME_OUT_4') {
+      stepMessage = `Time Out 4 (Overtime Out) recorded for ${employee.name} at ${displayTime}. All daily scans finished! Total: ${calc.regularHours}h reg + ${calc.overtimeHours}h OT. [Scan 8/8]`;
     }
 
     const updatedLog = {
@@ -1188,13 +1213,15 @@ export const DataProvider = ({ children }) => {
       branchId: employee.branchId,
       date: todayStr,
       timeIn: in1, // backward compatibility
-      timeOut: out3 || out2 || out1 || null, // backward compatibility
+      timeOut: out4 || out3 || out2 || out1 || null, // backward compatibility
       in1,
       out1,
       in2,
       out2,
       in3,
       out3,
+      in4,
+      out4,
       breakMinutes: 60,
       regularHours: calc.regularHours,
       overtimeHours: calc.overtimeHours,
@@ -1264,7 +1291,7 @@ export const DataProvider = ({ children }) => {
   };
 
   /**
-   * MANUAL DTR / ATTENDANCE RECORD ACTIONS (Supports 3 In/Out pairs)
+   * MANUAL DTR / ATTENDANCE RECORD ACTIONS (Supports 4 In/Out pairs / 8 punches)
    */
   const recordPunch = (employeeId, type = 'AUTO', customTime = null) => {
     const now = new Date();
@@ -1292,24 +1319,30 @@ export const DataProvider = ({ children }) => {
     let out2 = existingLog?.out2 || null;
     let in3 = existingLog?.in3 || null;
     let out3 = existingLog?.out3 || null;
+    let in4 = existingLog?.in4 || null;
+    let out4 = existingLog?.out4 || null;
 
     let stepAction = '';
     let stepLabel = '';
 
     // If type is IN or AUTO: find next open IN punch
-    if (type === 'IN' || (type === 'AUTO' && (!in1 || (out1 && !in2) || (out2 && !in3)))) {
+    if (type === 'IN' || (type === 'AUTO' && (!in1 || (out1 && !in2) || (out2 && !in3) || (out3 && !in4)))) {
       if (!in1) {
         in1 = timeHHMM;
         stepAction = 'TIME_IN_1';
-        stepLabel = 'Manual Punch In 1 (Morning)';
+        stepLabel = 'Manual Punch In 1 (Morning Check-In)';
       } else if (out1 && !in2) {
         in2 = timeHHMM;
         stepAction = 'TIME_IN_2';
-        stepLabel = 'Manual Punch In 2 (Afternoon)';
+        stepLabel = 'Manual Punch In 2 (Morning Break In)';
       } else if (out2 && !in3) {
         in3 = timeHHMM;
         stepAction = 'TIME_IN_3';
-        stepLabel = 'Manual Punch In 3 (Overtime)';
+        stepLabel = 'Manual Punch In 3 (Lunch Break In)';
+      } else if (out3 && !in4) {
+        in4 = timeHHMM;
+        stepAction = 'TIME_IN_4';
+        stepLabel = 'Manual Punch In 4 (Overtime In)';
       } else {
         return { success: false, message: 'Active punch in session already open. Please punch out first.' };
       }
@@ -1318,21 +1351,25 @@ export const DataProvider = ({ children }) => {
       if (in1 && !out1) {
         out1 = timeHHMM;
         stepAction = 'TIME_OUT_1';
-        stepLabel = 'Manual Punch Out 1 (Lunch)';
+        stepLabel = 'Manual Punch Out 1 (Morning Break Out)';
       } else if (in2 && !out2) {
         out2 = timeHHMM;
         stepAction = 'TIME_OUT_2';
-        stepLabel = 'Manual Punch Out 2 (Dismissal)';
+        stepLabel = 'Manual Punch Out 2 (Lunch Break Out)';
       } else if (in3 && !out3) {
         out3 = timeHHMM;
         stepAction = 'TIME_OUT_3';
-        stepLabel = 'Manual Punch Out 3 (Overtime Out)';
+        stepLabel = 'Manual Punch Out 3 (Regular Shift Dismissal)';
+      } else if (in4 && !out4) {
+        out4 = timeHHMM;
+        stepAction = 'TIME_OUT_4';
+        stepLabel = 'Manual Punch Out 4 (Overtime Out)';
       } else {
         return { success: false, message: 'No open Punch In found. Please punch in first.' };
       }
     }
 
-    const updatedPunches = { in1, out1, in2, out2, in3, out3 };
+    const updatedPunches = { in1, out1, in2, out2, in3, out3, in4, out4 };
     const calc = calculateTimeEntry(updatedPunches, currentShift);
 
     const updatedLog = {
@@ -1342,13 +1379,15 @@ export const DataProvider = ({ children }) => {
       branchId: employee.branchId,
       date: todayStr,
       timeIn: in1,
-      timeOut: out3 || out2 || out1 || null,
+      timeOut: out4 || out3 || out2 || out1 || null,
       in1,
       out1,
       in2,
       out2,
       in3,
       out3,
+      in4,
+      out4,
       breakMinutes: 60,
       regularHours: calc.regularHours,
       overtimeHours: calc.overtimeHours,
@@ -1408,8 +1447,10 @@ export const DataProvider = ({ children }) => {
     const out2 = entryData.out2 || null;
     const in3 = entryData.in3 || null;
     const out3 = entryData.out3 || null;
+    const in4 = entryData.in4 || null;
+    const out4 = entryData.out4 || null;
 
-    const punches = { in1, out1, in2, out2, in3, out3 };
+    const punches = { in1, out1, in2, out2, in3, out3, in4, out4 };
     const calc = calculateTimeEntry(punches, currentShift);
 
     const newLog = {
@@ -1419,13 +1460,15 @@ export const DataProvider = ({ children }) => {
       branchId: employee.branchId,
       date: entryData.date,
       timeIn: in1,
-      timeOut: out3 || out2 || out1 || null,
+      timeOut: out4 || out3 || out2 || out1 || null,
       in1,
       out1,
       in2,
       out2,
       in3,
       out3,
+      in4,
+      out4,
       breakMinutes: Number(entryData.breakMinutes) || 60,
       regularHours: calc.regularHours,
       overtimeHours: calc.overtimeHours,

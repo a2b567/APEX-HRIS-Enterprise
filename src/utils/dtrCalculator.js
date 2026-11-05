@@ -1,14 +1,15 @@
 /**
  * DTR Calculation Engine
- * Supports single time in/out as well as 3-session In & Out (6 punches per day):
- * - Session 1: Morning In (in1) & Lunch Out (out1)
- * - Session 2: Afternoon In (in2) & Shift Dismissal (out2)
- * - Session 3: Overtime In (in3) & Overtime Out (out3)
+ * Supports 4-session In & Out (8 punches per day):
+ * - Session 1: Morning In (in1) & Morning Break Out (out1)
+ * - Session 2: Morning Break In (in2) & Lunch Break Out (out2)
+ * - Session 3: Lunch Break In (in3) & Regular Shift Dismissal (out3)
+ * - Session 4: Overtime In (in4) & Overtime Out (out4)
  *
  * Rules:
  * - Grace period: 15 minutes (08:00 -> up to 08:15 no late penalty, after 08:15 late from 08:00)
  * - Standard work hours: 8 hours
- * - Overtime: hours beyond 8 hours or work in Session 3 / past shift end
+ * - Overtime: hours in Session 4 (OT) or work beyond 8 regular hours
  */
 
 export const calculateMultiSessionTimeEntry = (
@@ -21,8 +22,10 @@ export const calculateMultiSessionTimeEntry = (
   const out2 = record.out2 || null;
   const in3 = record.in3 || null;
   const out3 = record.out3 || null;
+  const in4 = record.in4 || null;
+  const out4 = record.out4 || null;
 
-  if (!in1 && !in2 && !in3) {
+  if (!in1 && !in2 && !in3 && !in4) {
     return {
       regularHours: 0,
       overtimeHours: 0,
@@ -68,34 +71,44 @@ export const calculateMultiSessionTimeEntry = (
   const s1Minutes = getSessionMinutes(in1, out1);
   const s2Minutes = getSessionMinutes(in2, out2);
   const s3Minutes = getSessionMinutes(in3, out3);
+  const s4Minutes = getSessionMinutes(in4, out4);
+
+  // Compensable coffee/morning break (short rest periods <= 20 min under DOLE / Labor Code Art. 84)
+  let compensableBreakM = 0;
+  if (out1 && in2) {
+    const gap = getSessionMinutes(out1, in2);
+    if (gap > 0 && gap <= 20) {
+      compensableBreakM = gap;
+    }
+  }
 
   let totalWorkedMinutes = 0;
-  if (out1 && !in2 && !in3) {
-    // Single session fallback: if single continuous session > 5h, deduct standard 60m lunch break
+  if (out1 && !in2 && !in3 && !in4) {
+    // Single session fallback
     const breakMinutes = (s1Minutes > 300) ? (record.breakMinutes ?? 60) : 0;
     totalWorkedMinutes = Math.max(0, s1Minutes - breakMinutes);
   } else {
-    // Multi-session: meal/break time between out1 and in2 is already excluded naturally
-    totalWorkedMinutes = s1Minutes + s2Minutes + s3Minutes;
+    // Multi-session
+    totalWorkedMinutes = s1Minutes + s2Minutes + s3Minutes + compensableBreakM + s4Minutes;
   }
 
   // Calculate Overtime:
-  // 1. Any minutes rendered in Session 3 (Overtime session)
-  // 2. Any minutes in Session 2 rendered past shiftEnd (17:00)
+  // 1. Any minutes rendered in Session 4 (Overtime session)
+  // 2. Any minutes in Session 3 rendered past shiftEnd (17:00)
   // 3. Regular hours exceeding 8 hours (480 mins)
   let overtimeMinutes = 0;
 
-  if (s3Minutes > 0) {
-    overtimeMinutes += s3Minutes;
+  if (s4Minutes > 0) {
+    overtimeMinutes += s4Minutes;
   }
 
-  const out2M = toMinutes(out2);
-  if (out2M && out2M > shiftEndMinutes && !s3Minutes) {
-    const extraM = Math.min(s2Minutes, out2M - shiftEndMinutes);
+  const out3M = toMinutes(out3);
+  if (out3M && out3M > shiftEndMinutes && !s4Minutes) {
+    const extraM = Math.min(s3Minutes, out3M - shiftEndMinutes);
     overtimeMinutes += extraM;
   }
 
-  const regularSessionsMinutes = s1Minutes + s2Minutes;
+  const regularSessionsMinutes = s1Minutes + s2Minutes + s3Minutes + compensableBreakM;
   if (regularSessionsMinutes > 480) {
     const excess = regularSessionsMinutes - 480;
     if (excess > overtimeMinutes) {
@@ -108,11 +121,11 @@ export const calculateMultiSessionTimeEntry = (
   const overtimeHours = Number((overtimeMinutes / 60).toFixed(2));
 
   // Undertime calculation:
-  // If the day's regular departure has been clocked out (out2, or out1 without subsequent sessions)
+  // If the day's regular departure has been clocked out (out3, or out2/out1 if earlier finish)
   let undertimeMinutes = 0;
-  const isFinalOutClocked = Boolean(out3 || out2 || (out1 && !in2));
+  const isFinalOutClocked = Boolean(out4 || out3 || (out2 && !in3) || (out1 && !in2));
   if (isFinalOutClocked && regularMinutes < 480) {
-    const activeOut = out2 || out1;
+    const activeOut = out3 || out2 || out1;
     const activeOutM = toMinutes(activeOut);
     if (activeOutM && activeOutM < shiftEndMinutes) {
       undertimeMinutes = Math.min(shiftEndMinutes - activeOutM, 480 - regularMinutes);
@@ -122,7 +135,7 @@ export const calculateMultiSessionTimeEntry = (
   let status = 'Present';
   if (lateMinutes > 0) status = 'Late';
   if (regularHours < 4 && regularHours > 0 && isFinalOutClocked) status = 'Half-day';
-  if (totalWorkedMinutes === 0 && (in1 || in2 || in3)) {
+  if (totalWorkedMinutes === 0 && (in1 || in2 || in3 || in4)) {
     status = lateMinutes > 0 ? 'Late' : 'Present';
   }
 
@@ -136,6 +149,7 @@ export const calculateMultiSessionTimeEntry = (
     s1Minutes,
     s2Minutes,
     s3Minutes,
+    s4Minutes,
   };
 };
 
@@ -145,12 +159,10 @@ export const calculateTimeEntry = (
   breakMinutes = 60,
   shift = { startTime: '08:00', endTime: '17:00', gracePeriodMinutes: 15 }
 ) => {
-  // Check if first parameter is an object (record)
   if (timeInOrRecord && typeof timeInOrRecord === 'object') {
     return calculateMultiSessionTimeEntry(timeInOrRecord, timeOut || shift);
   }
 
-  // Standard legacy signature: calculateTimeEntry(timeIn, timeOut, breakMinutes, shift)
   const timeIn = timeInOrRecord;
   if (!timeIn && !timeOut) {
     return {
@@ -164,4 +176,5 @@ export const calculateTimeEntry = (
 
   return calculateMultiSessionTimeEntry({ timeIn, timeOut, breakMinutes }, shift);
 };
+
 
