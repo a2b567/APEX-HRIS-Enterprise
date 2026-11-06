@@ -185,22 +185,29 @@ export const EmployeeDashboard = () => {
             {/* Shift hours indicator */}
             <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-50 border border-slate-200 text-[11px] text-slate-600 font-medium">
               <Clock className="w-3.5 h-3.5 text-blue-600" />
-              <span>Shift: 08:00 AM – 05:00 PM (15m grace)</span>
+              <span>
+                Shift: {formatTime(settings?.defaultShift?.startTime || '08:00')} – {formatTime(settings?.defaultShift?.endTime || '17:00')} ({settings?.defaultShift?.gracePeriodMinutes ?? 15}m grace)
+              </span>
             </div>
           </div>
 
           {/* Today's QR Punch Status Display */}
-          <div className="my-4 bg-slate-50 p-4 rounded-xl border border-slate-200/80 text-xs text-left space-y-3">
+          <div className="my-4 bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 text-xs text-left space-y-2.5">
             <div className="flex items-center justify-between">
-              <span className="text-slate-500 font-medium">QR Attendance Status:</span>
-              {todayLog?.timeIn && !todayLog?.timeOut ? (
+              <span className="text-slate-500 font-medium">Today's QR Attendance:</span>
+              {todayLog?.lastAction ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-300">
+                  <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                  {todayLog.lastAction} (Scan {todayLog.lastScanNumber || 1}/8)
+                </span>
+              ) : todayLog?.timeIn && !todayLog?.timeOut ? (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
                   <span className="w-2 h-2 rounded-full bg-emerald-600 animate-ping"></span>
                   Clocked In
                 </span>
               ) : todayLog?.timeIn && todayLog?.timeOut ? (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-300">
-                  Clocked Out
+                  Completed
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
@@ -209,17 +216,46 @@ export const EmployeeDashboard = () => {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/60">
-              <div className="bg-white p-2.5 rounded-lg border border-slate-200">
-                <span className="text-[10px] uppercase font-semibold text-slate-400 block">Time In</span>
-                <span className="font-mono font-bold text-slate-900 text-sm">
-                  {todayLog?.timeIn ? formatTime(todayLog.timeIn) : '— —'}
+            {/* 4 Sessions Tracker */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 pt-1 border-t border-slate-200/60 font-mono text-[11px]">
+              <div className="bg-white p-2 rounded-lg border border-slate-200">
+                <span className="text-[9px] uppercase font-bold text-blue-700 block font-sans">S1: Morning</span>
+                <span className="text-slate-800 font-semibold text-[11px]">
+                  {todayLog?.in1 || todayLog?.timeIn ? formatTime(todayLog.in1 || todayLog.timeIn) : '—'}
+                </span>
+                <span className="text-slate-400 mx-0.5">/</span>
+                <span className="text-slate-600 text-[11px]">
+                  {todayLog?.out1 ? formatTime(todayLog.out1) : (!todayLog?.in2 && todayLog?.timeOut ? formatTime(todayLog.timeOut) : '—')}
                 </span>
               </div>
-              <div className="bg-white p-2.5 rounded-lg border border-slate-200">
-                <span className="text-[10px] uppercase font-semibold text-slate-400 block">Time Out</span>
-                <span className="font-mono font-bold text-slate-900 text-sm">
-                  {todayLog?.timeOut ? formatTime(todayLog.timeOut) : '— —'}
+              <div className="bg-white p-2 rounded-lg border border-slate-200">
+                <span className="text-[9px] uppercase font-bold text-teal-700 block font-sans">S2: Mid-Day</span>
+                <span className="text-slate-800 font-semibold text-[11px]">
+                  {todayLog?.in2 ? formatTime(todayLog.in2) : '—'}
+                </span>
+                <span className="text-slate-400 mx-0.5">/</span>
+                <span className="text-slate-600 text-[11px]">
+                  {todayLog?.out2 ? formatTime(todayLog.out2) : '—'}
+                </span>
+              </div>
+              <div className="bg-white p-2 rounded-lg border border-slate-200">
+                <span className="text-[9px] uppercase font-bold text-indigo-700 block font-sans">S3: Afternoon</span>
+                <span className="text-slate-800 font-semibold text-[11px]">
+                  {todayLog?.in3 ? formatTime(todayLog.in3) : '—'}
+                </span>
+                <span className="text-slate-400 mx-0.5">/</span>
+                <span className="text-slate-600 text-[11px]">
+                  {todayLog?.out3 ? formatTime(todayLog.out3) : '—'}
+                </span>
+              </div>
+              <div className="bg-white p-2 rounded-lg border border-slate-200">
+                <span className="text-[9px] uppercase font-bold text-amber-700 block font-sans">S4: Overtime</span>
+                <span className="text-slate-800 font-semibold text-[11px]">
+                  {todayLog?.in4 ? formatTime(todayLog.in4) : '—'}
+                </span>
+                <span className="text-slate-400 mx-0.5">/</span>
+                <span className="text-slate-600 text-[11px]">
+                  {todayLog?.out4 ? formatTime(todayLog.out4) : '—'}
                 </span>
               </div>
             </div>
@@ -260,7 +296,7 @@ export const EmployeeDashboard = () => {
                   <div>
                     <p className="font-semibold text-slate-900">{formatDate(log.date)}</p>
                     <p className="text-[11px] text-slate-500 font-mono mt-0.5">
-                      {formatTime(log.timeIn)} – {formatTime(log.timeOut)}
+                      {formatTime(log.in1 || log.timeIn)} – {formatTime(log.out4 || log.out3 || log.out2 || log.out1 || log.timeOut)}
                     </p>
                   </div>
                   <div className="text-right">
